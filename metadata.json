@@ -1,0 +1,8 @@
+{
+  "name": "Clínica Psico App",
+  "description": "Sistema de gestão clínica e prontuários para psicólogos e terapeutas",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

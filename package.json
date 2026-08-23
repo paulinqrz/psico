@@ -1,0 +1,58 @@
+{
+  "name": "clinica-psico-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Sistema de Gestão para Clínica de Psicologia",
+  "author": "Dr/Dra",
+  "type": "module",
+  "main": "electron-main.cjs",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build:exe": "npm run build && electron-builder",
+    "start": "node dist/server.cjs",
+    "lint": "tsc --noEmit"
+  },
+  "build": {
+    "appId": "com.clinicapsico.app",
+    "productName": "Clínica Psico App",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron-main.cjs",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  },
+  "dependencies": {
+    "@types/express": "^5.0.6",
+    "esbuild": "^0.28.2",
+    "express": "^5.2.1",
+    "lucide-react": "^0.344.0",
+    "openai": "^7.5.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.3",
+    "tsx": "^4.23.12"
+  },
+  "devDependencies": {
+    "electron": "^29.1.0",
+    "electron-builder": "^24.13.3",
+    "@types/node": "^20.11.24",
+    "@types/react": "^18.2.64",
+    "@types/react-dom": "^18.2.21",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.5"
+  }
+}
