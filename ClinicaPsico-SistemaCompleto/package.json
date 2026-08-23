@@ -1,0 +1,30 @@
+{
+  "name": "clinica-psico-app",
+  "version": "1.0.0",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "postinstall": "prisma generate && prisma db push"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@prisma/client": "^5.10.2",
+    "lucide-react": "^0.344.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "@types/react": "^18.2.64",
+    "@types/react-dom": "^18.2.21",
+    "@types/node": "^20.11.24",
+    "electron": "^29.1.0",
+    "electron-vite": "^2.1.0",
+    "prisma": "^5.10.2",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.5"
+  }
+}
