@@ -1,0 +1,15 @@
+SISTEMA DE GESTÃO - MÁRCIA HELENA PSICOLOGIA
+============================================
+
+Este é o seu aplicativo de prontuários.
+
+COMO ABRIR:
+1. Dê um duplo clique no arquivo "INICIAR_CLINICA.vbs".
+2. Ele abrirá o sistema como um aplicativo de verdade no seu computador, sem telas pretas de terminal no fundo.
+
+COMO GERAR UM EXECUTÁVEL FINAL (.exe):
+1. Dê um duplo clique em "gerar_executavel.bat".
+2. Ao finalizar, procure o seu programa .exe dentro da pasta "release".
+
+CHAVE DA OPENAI (CHAT CLÍNICO):
+Lembre-se de manter sua chave da OpenAI configurada no arquivo "env.txt".

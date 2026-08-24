@@ -1,7 +1,6 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
-const http = require('http');
 
 let mainWindow;
 let serverProcess;
@@ -10,54 +9,50 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    title: "Clínica Psico App",
+    title: "Márcia Helena - Psicologia",
+    autoHideMenuBar: true,
     webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true
+      nodeIntegration: true
     }
   });
   
-  // Ocultar a barra de menu padrão para ficar parecido com um app nativo
-  mainWindow.setMenuBarVisibility(false);
+  mainWindow.loadURL('http://localhost:3000');
   
-  mainWindow.loadURL('http://127.0.0.1:3000');
+  mainWindow.on('closed', function () {
+    mainWindow = null;
+  });
 }
 
-function checkServerAndLoad() {
-  // Faz ping no servidor local até ele responder, para evitar a tela branca de erro
-  const req = http.get('http://127.0.0.1:3000', (res) => {
-    if (res.statusCode) {
-      createWindow();
+app.on('ready', () => {
+  // Inicializa o servidor backend Node
+  const serverPath = path.join(__dirname, 'dist', 'server.cjs');
+  serverProcess = spawn('node', [serverPath]);
+  
+  serverProcess.stdout.on('data', (data) => {
+    console.log(`Server: ${data}`);
+    // Espera o servidor subir na porta 3000 para abrir a tela
+    if (data.toString().includes('3000') || data.toString().includes('running')) {
+      if (!mainWindow) createWindow();
     }
   });
-  req.on('error', () => {
-    setTimeout(checkServerAndLoad, 500);
-  });
-}
-
-app.whenReady().then(() => {
-  // Iniciar o backend seguro do Express (que carrega a chave da OpenAI e o frontend)
-  const serverPath = path.join(__dirname, '../dist/server.cjs');
   
-  serverProcess = spawn('node', [serverPath], {
-    env: { ...process.env, NODE_ENV: 'production', PORT: '3000' }
+  serverProcess.stderr.on('data', (data) => {
+    console.error(`Server Error: ${data}`);
   });
 
-  serverProcess.stdout.on('data', (data) => console.log(`Servidor: ${data}`));
-  serverProcess.stderr.on('data', (data) => console.error(`Erro Servidor: ${data}`));
-
-  // Aguardar o servidor responder antes de abrir a janela principal
-  checkServerAndLoad();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+  // Fallback: se não capturar a mensagem, abre a tela em 3 segundos
+  setTimeout(() => {
+    if (!mainWindow) createWindow();
+  }, 3000);
 });
 
-app.on('window-all-closed', () => {
-  // Matar o servidor Express quando fechar o aplicativo
+app.on('window-all-closed', function () {
+  if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('quit', () => {
+  // Encerra o backend ao fechar o app
   if (serverProcess) {
     serverProcess.kill();
   }
-  if (process.platform !== 'darwin') app.quit();
 });

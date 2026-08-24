@@ -226,7 +226,7 @@ const SEED_ANALISES_IA: AnaliseIA[] = [
 ]
 
 const SEED_CONFIG: ConfiguracoesApp = {
-  nomeProfissional: 'Dra. Vanessa Martins',
+  nomeProfissional: 'Márcia Helena',
   crp: '06/123456',
   especialidade: 'Psicologia Clínica & TCC',
   enderecoConsultorio: 'Av. Paulista, 1500 - Sala 804, Bela Vista - São Paulo/SP',
@@ -608,6 +608,21 @@ export const api = {
 
   // ASSISTENTE DE IA COM RASTREABILIDADE, GOVERNANÇA E PRIVACIDADE (OPENAI COMPATIBLE)
   ia: {
+    conversar: async (messages: { role: string, content: string }[]): Promise<any> => {
+      try {
+        const response = await fetch('/api/ia/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages })
+        });
+        if (response.ok) {
+          return await response.json();
+        }
+      } catch (err) {
+        console.warn('Erro ao chamar /api/ia/chat:', err);
+      }
+      return { success: false, error: 'Erro de comunicação.' };
+    },
     verificarStatus: async () => {
       try {
         const res = await fetch('/api/ia/status')

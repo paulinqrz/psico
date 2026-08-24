@@ -11,7 +11,8 @@ import {
   Check,
   HelpCircle,
   XCircle,
-  FileCheck
+  FileCheck,
+  MessageSquare
 } from 'lucide-react'
 import { AnaliseIA, Paciente, Sessao, StatusRevisaoIA } from '../types'
 import { ConsentPrivacyModal } from './ConsentPrivacyModal'
@@ -28,6 +29,10 @@ export const AssistenteIAModule: React.FC = () => {
   const [consentModalAberto, setConsentModalAberto] = useState(false)
   const [analiseSelecionada, setAnaliseSelecionada] = useState<AnaliseIA | null>(null)
   const [obsRevisao, setObsRevisao] = useState('')
+  const [activeTab, setActiveTab] = useState<'analise' | 'chat'>('chat') // Defaulting to chat tab
+  const [chatMessages, setChatMessages] = useState<{role: string, content: string}[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
   const [statusIA, setStatusIA] = useState<{ provedor: string; configurada: boolean; modo: string }>({
     provedor: 'OpenAI (GPT-4o / GPT-4o-mini)',
     configurada: false,
@@ -114,6 +119,32 @@ export const AssistenteIAModule: React.FC = () => {
     return p ? p.nome : 'Paciente'
   }
 
+  const handleSendChat = async () => {
+    if (!chatInput.trim()) return;
+    const newMsg = { role: 'user', content: chatInput };
+    const updatedMessages = [...chatMessages, newMsg];
+    setChatMessages(updatedMessages);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const resp = await (window as any).api.ia.conversar(updatedMessages);
+      if (resp && resp.success && resp.message) {
+        setChatMessages([...updatedMessages, resp.message]);
+      } else {
+        mostrarToast('Erro ao receber resposta do assistente.');
+      }
+    } catch (e) {
+      mostrarToast('Falha na comunicação com o assistente.');
+    } finally {
+      setChatLoading(false);
+    }
+  }
+
+  const handleKeyDownChat = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') handleSendChat();
+  }
+
   return (
     <div className="page-enter" style={{ padding: '36px 40px' }}>
       {toastMsg && (
@@ -177,8 +208,109 @@ export const AssistenteIAModule: React.FC = () => {
         </div>
       </div>
 
-      {/* Layout Duas Colunas: Solicitação / Histórico e Detalhes */}
+      {/* TABS */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', borderBottom: '1px solid #e2e8f0', paddingBottom: '0' }}>
+        <button
+          onClick={() => setActiveTab('chat')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '12px 16px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            color: activeTab === 'chat' ? '#2563eb' : '#64748b',
+            borderBottom: activeTab === 'chat' ? '2px solid #2563eb' : '2px solid transparent',
+            marginBottom: '-1px'
+          }}
+        >
+          Chat Clínico (Discussão)
+        </button>
+        <button
+          onClick={() => setActiveTab('analise')}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: '12px 16px',
+            fontSize: '14px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            color: activeTab === 'analise' ? '#2563eb' : '#64748b',
+            borderBottom: activeTab === 'analise' ? '2px solid #2563eb' : '2px solid transparent',
+            marginBottom: '-1px'
+          }}
+        >
+          Análise Estruturada & Critérios
+        </button>
+      </div>
+
+      {activeTab === 'chat' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 280px)', background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          {/* Chat History */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#f8fafc' }}>
+            {chatMessages.length === 0 ? (
+              <div style={{ margin: 'auto', textAlign: 'center', color: '#94a3b8' }}>
+                <MessageSquare size={48} style={{ opacity: 0.3, marginBottom: '16px' }} />
+                <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', color: '#334155' }}>Como posso ajudar?</h3>
+                <p style={{ margin: 0, fontSize: '14px' }}>Tire dúvidas sobre abordagens, peça ideias de intervenção ou discuta casos clínicos de forma segura.</p>
+              </div>
+            ) : (
+              chatMessages.map((msg, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  <div style={{
+                    maxWidth: '75%',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    background: msg.role === 'user' ? '#2563eb' : '#ffffff',
+                    color: msg.role === 'user' ? '#ffffff' : '#1e293b',
+                    border: msg.role === 'user' ? 'none' : '1px solid #e2e8f0',
+                    boxShadow: msg.role === 'user' ? 'none' : '0 1px 3px rgba(0,0,0,0.05)',
+                    fontSize: '14px',
+                    lineHeight: '1.5'
+                  }}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))
+            )}
+            {chatLoading && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{ padding: '12px 16px', borderRadius: '12px', background: '#ffffff', border: '1px solid #e2e8f0', fontSize: '14px', color: '#64748b' }}>
+                  <Sparkles size={14} style={{ display: 'inline', marginRight: '6px', animation: 'pulse 2s infinite' }} />
+                  Pensando...
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Chat Input */}
+          <div style={{ padding: '16px', background: '#ffffff', borderTop: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <input
+                type="text"
+                className="input"
+                style={{ flex: 1, padding: '12px 16px', borderRadius: '24px' }}
+                placeholder="Digite sua dúvida clínica ou peça orientações..."
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={handleKeyDownChat}
+                disabled={chatLoading}
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ padding: '0 20px', borderRadius: '24px' }}
+                onClick={handleSendChat}
+                disabled={chatLoading || !chatInput.trim()}
+              >
+                <Send size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(340px, 460px) 1fr', gap: '24px' }}>
+        {/* Layout Duas Colunas: Solicitação / Histórico e Detalhes */}
         
         {/* Coluna 1: Solicitar Nova Análise & Histórico */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -506,6 +638,7 @@ export const AssistenteIAModule: React.FC = () => {
         </div>
 
       </div>
+      )}
     </div>
   )
 }

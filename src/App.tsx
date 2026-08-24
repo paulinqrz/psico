@@ -2048,8 +2048,8 @@ function Layout({
         <div className="sidebar-brand">
           <div className="logo-icon">Ψ</div>
           <div>
-            <h2>Clínica Psico</h2>
-            <span>Gestão & Prontuário</span>
+            <h2>Márcia Helena</h2>
+            <span>Psicologia Clínica</span>
           </div>
         </div>
 

@@ -1,7 +1,9 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: 'env.txt' });
 import express from 'express';
 import path from 'path';
 import OpenAI from 'openai';
-import { createServer as createViteServer } from 'vite';
+// Vite import will be dynamic to avoid require('vite') in production
 
 async function startServer() {
   const app = express();
@@ -162,6 +164,43 @@ Mantenha tom estritamente técnico, ético, objetivo e respeitoso. Não adicione
     }
   });
 
+  // --- ROTA DE CHAT INTERATIVO ---
+  app.post('/api/ia/chat', async (req, res) => {
+    try {
+      const { messages } = req.body;
+      const client = getOpenAIClient();
+
+      if (!client) {
+        return res.json({
+          success: true,
+          message: { role: 'assistant', content: '[MODO OFFLINE] A chave da OpenAI não está configurada no servidor. Configure a chave para conversar comigo de verdade.' }
+        });
+      }
+
+      const systemMessage = {
+        role: 'system',
+        content: 'Você é um assistente especializado em psicologia clínica. Responda de forma ética, profissional e acolhedora, auxiliando o psicólogo em suas reflexões e dúvidas.'
+      };
+
+      const completion = await client.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [systemMessage, ...(messages || [])],
+        temperature: 0.7
+      });
+
+      return res.json({
+        success: true,
+        message: completion.choices[0]?.message
+      });
+    } catch (error: any) {
+      console.error('Erro no chat OpenAI:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || 'Erro ao conversar com a OpenAI.'
+      });
+    }
+  });
+
   // --- FALLBACK HEURÍSTICO LOCAL QUANDO OFFLINE OU SEM CHAVE ---
   function gerarAnaliseHeuristica(tipoAnalise: string, texto: string) {
     const lower = (texto || '').toLowerCase();
@@ -209,22 +248,29 @@ Mantenha tom estritamente técnico, ético, objetivo e respeitoso. Não adicione
 
   // --- VITE MIDDLEWARE (DEV) E ARQUIVOS ESTÁTICOS (PROD) ---
   if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    // Em produção (Electron ASAR), o server.cjs já está dentro da pasta dist
+    const distPath = typeof __dirname !== 'undefined' ? __dirname : path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    // Express 5 supports app.get('*all', ...) or app.get('*', ...)
-    app.get('*all', (req, res) => {
+    app.use((req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor Clínico Seguro rodando em http://0.0.0.0:${PORT}`);
+  const server = app.listen(PORT, '127.0.0.1', () => {
+    console.log(`Servidor Clínico Seguro rodando em http://127.0.0.1:${PORT}`);
+  });
+
+  server.on('error', (e: any) => {
+    if (e.code === 'EADDRINUSE') {
+      console.error(`Porta ${PORT} já está em uso! Tentando ligar de qualquer forma...`);
+    }
   });
 }
 
