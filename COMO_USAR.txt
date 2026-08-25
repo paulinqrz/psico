@@ -3,8 +3,12 @@ SISTEMA DE GESTÃO - MÁRCIA HELENA PSICOLOGIA
 
 Este é o seu aplicativo de prontuários.
 
+COMO CRIAR ATALHO NA ÁREA DE TRABALHO:
+- Dê um duplo clique no arquivo "CRIAR_ATALHO_AREA_DE_TRABALHO.bat".
+- Ele criará automaticamente um atalho bonito "Marcia Helena - Psicologia" na sua Área de Trabalho.
+
 COMO ABRIR:
-1. Dê um duplo clique no arquivo "INICIAR_CLINICA.vbs".
+1. Dê um duplo clique no atalho da Área de Trabalho ou no arquivo "INICIAR_CLINICA.vbs".
 2. Ele abrirá o sistema como um aplicativo de verdade no seu computador, sem telas pretas de terminal no fundo.
 
 COMO GERAR UM EXECUTÁVEL FINAL (.exe):

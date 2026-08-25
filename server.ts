@@ -1,10 +1,8 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
-const envPath = typeof __dirname !== 'undefined' 
-  ? path.join(__dirname, '../env.txt') 
-  : 'env.txt';
-dotenv.config({ path: envPath });
+// Standard .env loading (dotenv.config() defaults to .env in cwd)
+dotenv.config();
 
 import express from 'express';
 import OpenAI from 'openai';

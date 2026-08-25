@@ -22,8 +22,7 @@
     "files": [
       "dist/**/*",
       "electron-main.cjs",
-      "package.json",
-      "env.txt"
+      "package.json"
     ],
     "win": {
       "target": [
