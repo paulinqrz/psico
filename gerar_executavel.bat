@@ -6,6 +6,10 @@ echo ========================================================
 echo.
 echo Preparando dependencias...
 call npm install
+if not exist "node_modules\@rollup\rollup-win32-x64-msvc" (
+    echo Ajustando dependencias nativas do Windows...
+    call npm install -D @rollup/rollup-win32-x64-msvc --no-save >nul 2>&1
+)
 echo.
 echo Construindo executavel (isso pode levar alguns minutos)...
 call npm run build:exe

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { HashRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'motion/react'
 import {
   LayoutDashboard,
   Users,
@@ -8,6 +9,7 @@ import {
   Plus,
   ChevronRight,
   ChevronLeft,
+  Menu,
   Save,
   X,
   ArrowLeft,
@@ -90,8 +92,15 @@ function Dashboard() {
     window.api.pacientes.listar().then((p: any) => setRecentPacientes(p.slice(0, 4)))
     window.api.sessoes.todas().then((s: any) => setRecentSessoes(s.slice(0, 4)))
     window.api.consultas.listar().then((c: any) => {
-      const hoje = new Date().toISOString().slice(0, 10)
-      const futuras = c.filter((item: any) => item.status !== 'concluido' && item.status !== 'cancelado')
+      const dataDeHoje = new Date().toISOString().slice(0, 10)
+      const futuras = c.filter((item: any) => {
+        // Must be pending and happen strictly today
+        const isPending = item.status !== 'concluido' && item.status !== 'cancelado'
+        const isToday = item.horarioAgendado.startsWith(dataDeHoje)
+        return isPending && isToday
+      })
+      // sort by time
+      futuras.sort((a: any, b: any) => new Date(a.horarioAgendado).getTime() - new Date(b.horarioAgendado).getTime())
       setProximasConsultas(futuras.slice(0, 4))
     })
     window.api.config.obter().then((c: any) => setConfig(c))
@@ -844,12 +853,39 @@ function DetalheEditarSessao({
     }
   }
 
+  const inserirTemplateSOAP = () => {
+    const template = `[ S ] SUBJETIVO (Relato do paciente):
+- 
+
+[ O ] OBJETIVO (Observações do terapeuta):
+- 
+
+[ A ] AVALIAÇÃO (Hipóteses e análise):
+- 
+
+[ P ] PLANO (Condutas e tarefas):
+- `
+    setAnotacoes(prev => (prev ? prev + '\n\n' + template : template))
+  }
+
+  const inserirTemplateBasico = () => {
+    const template = `Queixa Principal:
+- 
+
+Desenvolvimento da Sessão / Intervenções:
+- 
+
+Próximos Passos (Para casa):
+- `
+    setAnotacoes(prev => (prev ? prev + '\n\n' + template : template))
+  }
+
   if (!sessao) {
     return <div style={{ padding: '40px', color: '#64748b' }}>Carregando dados da sessão...</div>
   }
 
   return (
-    <div key={`detalhe-sessao-${sessaoId}`} className="page-enter" style={{ padding: '36px 40px', maxWidth: '900px', margin: '0 auto' }}>
+    <div key={`detalhe-sessao-${sessaoId}`} className="page-enter" style={{ padding: '36px 40px', maxWidth: '1000px', margin: '0 auto' }}>
       <Toast message="Sessão e anotações salvas com sucesso!" visible={toastVisible} onClose={() => setToastVisible(false)} />
 
       {/* Breadcrumb navigation */}
@@ -862,7 +898,7 @@ function DetalheEditarSessao({
           {paciente.nome}
         </button>
         <span>/</span>
-        <span className="breadcrumb-current">Registro da Sessão</span>
+        <span className="breadcrumb-current">Prontuário da Sessão</span>
       </div>
 
       {/* Top Header */}
@@ -883,10 +919,10 @@ function DetalheEditarSessao({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h1 className="title" style={{ fontSize: '22px', margin: 0 }}>
-                Evolução Clínica & Anotações
+                Evolução Clínica & Prontuário
               </h1>
               <span className="badge badge-emerald">
-                <Lock size={12} /> Confidencial
+                <Lock size={12} /> Sigilo
               </span>
             </div>
             <p className="subtitle" style={{ marginTop: '2px' }}>
@@ -896,71 +932,89 @@ function DetalheEditarSessao({
         </div>
 
         <button onClick={handleExcluir} className="btn btn-danger-outline" title="Excluir esta sessão">
-          <Trash2 size={16} /> Excluir Sessão
+          <Trash2 size={16} /> Excluir Registro
         </button>
       </div>
 
       {/* Form Card for editing */}
-      <div className="card">
-        <form onSubmit={handleSalvar}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-            {/* Date and Time */}
-            <div className="input-group" style={{ maxWidth: '320px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CalendarDays size={15} color="#2563eb" /> Data e Horário da Sessão
-              </label>
-              <input
-                type="datetime-local"
-                className="input"
-                value={dataSessao}
-                onChange={(e) => setDataSessao(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Session Title / Theme */}
-            <div className="input-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Sparkles size={15} color="#2563eb" /> Tema / Resumo Principal da Sessão (Visível no índice)
-              </label>
-              <input
-                type="text"
-                className="input"
-                value={resumo}
-                onChange={(e) => setResumo(e.target.value)}
-                placeholder="Ex: Alinhamento de expectativas e objetivos terapêuticos"
-                required
-                style={{ fontSize: '15px', fontWeight: 500 }}
-              />
-              <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                Esta frase identifica a sessão na lista de acompanhamento do paciente.
-              </span>
-            </div>
-
-            {/* Clinical Notes (Editable) */}
-            <div className="input-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <form onSubmit={handleSalvar} style={{ display: 'flex', flexDirection: 'column' }}>
+          
+          <div style={{ padding: '24px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc' }}>
+            <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
+              {/* Date and Time */}
+              <div className="input-group" style={{ flex: '0 0 240px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <FileText size={15} color="#2563eb" /> Anotações Clínicas & Evolução Terapêutica (Editáveis)
+                  <CalendarDays size={15} color="#2563eb" /> Data e Horário
                 </label>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>
-                  {anotacoes.length} caracteres
-                </span>
+                <input
+                  type="datetime-local"
+                  className="input"
+                  value={dataSessao}
+                  onChange={(e) => setDataSessao(e.target.value)}
+                  required
+                  style={{ background: '#fff' }}
+                />
               </div>
-              <textarea
-                className="input"
-                rows={10}
-                value={anotacoes}
-                onChange={(e) => setAnotacoes(e.target.value)}
-                placeholder="Escreva livremente o relato da sessão, técnicas aplicadas, reflexões do paciente, tarefas de casa e hipóteses diagnósticas..."
-                style={{
-                  resize: 'vertical',
-                  lineHeight: '1.6',
-                  fontFamily: 'inherit',
-                  padding: '14px 16px',
-                  background: '#fafbfc'
-                }}
-              />
+
+              {/* Session Title / Theme */}
+              <div className="input-group" style={{ flex: 1, minWidth: '300px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Sparkles size={15} color="#2563eb" /> Resumo do Atendimento
+                </label>
+                <input
+                  type="text"
+                  className="input"
+                  value={resumo}
+                  onChange={(e) => setResumo(e.target.value)}
+                  placeholder="Qual o tema principal desta sessão?"
+                  required
+                  style={{ fontSize: '15px', fontWeight: 500, background: '#fff' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: '24px' }}>
+            {/* Clinical Notes (Editable) */}
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                  <FileText size={15} color="#2563eb" /> Anotações do Prontuário
+                </label>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button type="button" onClick={inserirTemplateSOAP} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '12px' }}>
+                    <Plus size={14} /> Estrutura SOAP
+                  </button>
+                  <button type="button" onClick={inserirTemplateBasico} className="btn btn-secondary" style={{ padding: '4px 10px', fontSize: '12px' }}>
+                    <Plus size={14} /> Tópicos Básicos
+                  </button>
+                </div>
+              </div>
+              
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  className="input"
+                  rows={14}
+                  value={anotacoes}
+                  onChange={(e) => setAnotacoes(e.target.value)}
+                  placeholder="Escreva livremente o relato da sessão, técnicas aplicadas, reflexões do paciente..."
+                  style={{
+                    resize: 'vertical',
+                    lineHeight: '1.7',
+                    fontFamily: 'inherit',
+                    padding: '20px',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    fontSize: '15px',
+                    boxShadow: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.02)'
+                  }}
+                />
+                <div style={{ position: 'absolute', bottom: '12px', right: '16px', fontSize: '11px', color: '#94a3b8', background: '#fff', padding: '2px 6px', borderRadius: '4px' }}>
+                  {anotacoes.length} caracteres
+                </div>
+              </div>
             </div>
 
             {/* Info footer box */}
@@ -971,14 +1025,16 @@ function DetalheEditarSessao({
                 gap: '10px',
                 padding: '12px 16px',
                 borderRadius: '8px',
-                background: '#f1f5f9',
+                background: '#f8fafc',
+                border: '1px solid #f1f5f9',
                 fontSize: '12px',
-                color: '#475569'
+                color: '#64748b',
+                marginTop: '16px'
               }}
             >
-              <AlertCircle size={16} color="#64748b" style={{ flexShrink: 0 }} />
+              <AlertCircle size={16} color="#94a3b8" style={{ flexShrink: 0 }} />
               <span>
-                As anotações são salvas localmente com total privacidade de acordo com as normas de sigilo profissional do Conselho Federal de Psicologia (CFP).
+                As anotações são salvas localmente no seu dispositivo. Garanta a privacidade da sua tela durante os atendimentos (resolução CFP 01/2009).
               </span>
             </div>
           </div>
@@ -988,22 +1044,22 @@ function DetalheEditarSessao({
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginTop: '28px',
+              padding: '16px 24px',
               borderTop: '1px solid #f1f5f9',
-              paddingTop: '20px'
+              background: '#fafbfc'
             }}
           >
-            <button type="button" onClick={voltar} className="btn btn-secondary">
-              Voltar sem salvar
+            <button type="button" onClick={voltar} className="btn btn-secondary" style={{ color: '#64748b' }}>
+              Descartar alterações
             </button>
             <button
               id="btn-salvar-sessao"
               type="submit"
               className="btn btn-primary"
               disabled={salvando}
-              style={{ padding: '10px 24px', fontSize: '15px' }}
+              style={{ padding: '10px 28px', fontSize: '15px', fontWeight: 600, boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)' }}
             >
-              <Save size={18} /> {salvando ? 'Salvando...' : 'Salvar Alterações'}
+              <Save size={18} /> {salvando ? 'Salvando...' : 'Salvar Prontuário'}
             </button>
           </div>
         </form>
@@ -1058,6 +1114,33 @@ function ListaSessoesPaciente({
     setTimeout(() => setToastVisible(false), 3000)
     // Opcional: abre a sessão criada para edição se desejar
     setSessaoSelecionada(nova.id)
+  }
+
+  const inserirTemplateSOAPNovo = () => {
+    const template = `[ S ] SUBJETIVO (Relato do paciente):
+- 
+
+[ O ] OBJETIVO (Observações do terapeuta):
+- 
+
+[ A ] AVALIAÇÃO (Hipóteses e análise):
+- 
+
+[ P ] PLANO (Condutas e tarefas):
+- `
+    setAnotacoes(prev => (prev ? prev + '\n\n' + template : template))
+  }
+
+  const inserirTemplateBasicoNovo = () => {
+    const template = `Queixa Principal:
+- 
+
+Desenvolvimento da Sessão / Intervenções:
+- 
+
+Próximos Passos (Para casa):
+- `
+    setAnotacoes(prev => (prev ? prev + '\n\n' + template : template))
   }
 
   if (sessaoSelecionada && paciente) {
@@ -1206,15 +1289,25 @@ function ListaSessoesPaciente({
                 />
               </div>
 
-              <div className="input-group">
-                <label>Anotações Clínicas Iniciais</label>
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ margin: 0 }}>Anotações Iniciais do Prontuário</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button type="button" onClick={inserirTemplateSOAPNovo} className="btn btn-secondary" style={{ padding: '2px 8px', fontSize: '11px' }}>
+                      <Plus size={12} /> Estrutura SOAP
+                    </button>
+                    <button type="button" onClick={inserirTemplateBasicoNovo} className="btn btn-secondary" style={{ padding: '2px 8px', fontSize: '11px' }}>
+                      <Plus size={12} /> Tópicos
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   className="input"
-                  rows={5}
+                  rows={8}
                   value={anotacoes}
                   onChange={(e) => setAnotacoes(e.target.value)}
                   placeholder="Descreva o que foi trabalhado, técnicas aplicadas e observações..."
-                  style={{ resize: 'vertical' }}
+                  style={{ resize: 'vertical', lineHeight: '1.6', fontSize: '14px', background: '#fafbfc' }}
                 />
               </div>
             </div>
@@ -1650,6 +1743,20 @@ function TelaAgenda() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <AnimatePresence>
+            {semanaOffset !== 0 && (
+              <motion.button 
+                initial={{ opacity: 0, width: 0, scale: 0.8 }}
+                animate={{ opacity: 1, width: 'auto', scale: 1 }}
+                exit={{ opacity: 0, width: 0, scale: 0.8 }}
+                onClick={() => setSemanaOffset(0)} 
+                className="btn btn-secondary"
+                style={{ whiteSpace: 'nowrap', padding: '8px 16px', fontSize: '13px', overflow: 'hidden' }}
+              >
+                Voltar para Hoje
+              </motion.button>
+            )}
+          </AnimatePresence>
           <div
             style={{
               display: 'inline-flex',
@@ -1667,21 +1774,18 @@ function TelaAgenda() {
             >
               <ChevronLeft size={18} />
             </button>
-            <button
-              onClick={() => setSemanaOffset(0)}
-              style={{
-                background: semanaOffset === 0 ? '#eff6ff' : 'transparent',
-                color: semanaOffset === 0 ? '#2563eb' : '#334155',
-                border: 'none',
-                padding: '6px 14px',
-                fontSize: '13px',
-                fontWeight: 600,
-                borderRadius: '6px',
-                cursor: 'pointer'
+            <span 
+              style={{ 
+                fontSize: '13px', 
+                fontWeight: 600, 
+                color: '#334155', 
+                padding: '0 12px', 
+                minWidth: '150px', 
+                textAlign: 'center' 
               }}
             >
-              Hoje
-            </button>
+              {formatarIntervaloSemana()}
+            </span>
             <button
               onClick={() => setSemanaOffset((prev) => prev + 1)}
               className="btn btn-icon-only"
@@ -1713,7 +1817,7 @@ function TelaAgenda() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <CalendarDays size={18} color="#2563eb" />
           <span style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', textTransform: 'capitalize' }}>
-            {formatarIntervaloSemana()}
+            Resumo Semanal
           </span>
         </div>
 
@@ -2024,36 +2128,77 @@ function Layout({
 }) {
   const location = useLocation()
   const [config, setConfig] = useState<ConfiguracoesApp | null>(null)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
 
   useEffect(() => {
     window.api.config.obter().then((c: any) => setConfig(c))
   }, [location.pathname])
 
   const menuItems = [
-    { nome: 'Dashboard', icone: <LayoutDashboard size={18} />, rota: '/' },
-    { nome: 'Pacientes', icone: <Users size={18} />, rota: '/pacientes' },
-    { nome: 'Sessões Clínicas', icone: <MessageSquare size={18} />, rota: '/sessoes' },
-    { nome: 'Agenda & Fluxo', icone: <Calendar size={18} />, rota: '/agenda' },
-    { nome: 'Avaliações & Testes', icone: <ClipboardList size={18} />, rota: '/avaliacoes' },
-    { nome: 'Diagnósticos (DSM/CID)', icone: <FileBadge2 size={18} />, rota: '/diagnosticos' },
-    { nome: 'Assistente IA Ético', icone: <Sparkles size={18} color="#60a5fa" />, rota: '/ia-assistente' },
-    { nome: 'Relatórios & Docs', icone: <FileText size={18} />, rota: '/relatorios' },
-    { nome: 'Backup & Auditoria', icone: <Database size={18} />, rota: '/backup' },
-    { nome: 'Configurações', icone: <Settings size={18} />, rota: '/configuracoes' }
+    { nome: 'Dashboard', icone: <LayoutDashboard size={22} />, rota: '/' },
+    { nome: 'Pacientes', icone: <Users size={22} />, rota: '/pacientes' },
+    { nome: 'Sessões', icone: <MessageSquare size={22} />, rota: '/sessoes' },
+    { nome: 'Agenda', icone: <Calendar size={22} />, rota: '/agenda' },
+    { nome: 'Avaliações', icone: <ClipboardList size={22} />, rota: '/avaliacoes' },
+    { nome: 'Diagnósticos', icone: <FileBadge2 size={22} />, rota: '/diagnosticos' },
+    { nome: 'Assistente IA', icone: <Sparkles size={22} color="#60a5fa" />, rota: '/ia-assistente' },
+    { nome: 'Relatórios', icone: <FileText size={22} />, rota: '/relatorios' },
+    { nome: 'Auditoria', icone: <Database size={22} />, rota: '/backup' },
+    { nome: 'Ajustes', icone: <Settings size={22} />, rota: '/configuracoes' }
   ]
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: 'var(--bg-main)', overflow: 'hidden' }}>
-      <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column', width: '260px' }}>
-        <div className="sidebar-brand">
-          <div className="logo-icon">Ψ</div>
-          <div>
-            <h2>Márcia Helena</h2>
-            <span>Psicologia Clínica</span>
+      <motion.aside 
+        className="sidebar" 
+        initial={false}
+        animate={{ width: isSidebarOpen ? 260 : 80, minWidth: isSidebarOpen ? 260 : 80 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 50, borderRight: '1px solid var(--sidebar-hover)', background: 'var(--sidebar-bg)' }}
+      >
+        <div className="sidebar-brand" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isSidebarOpen ? '24px 20px' : '24px 0', minHeight: '84px', borderBottom: '1px solid var(--sidebar-hover)', marginBottom: '12px', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', overflow: 'hidden', width: '100%', justifyContent: isSidebarOpen ? 'flex-start' : 'center' }}>
+            <div className="logo-icon" style={{ flexShrink: 0 }}>Ψ</div>
+            <AnimatePresence>
+              {isSidebarOpen && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  <h2 style={{ fontSize: '18px', margin: 0, color: 'var(--bg-card)' }}>Márcia Helena</h2>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Psicologia Clínica</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              right: isSidebarOpen ? '10px' : 'auto',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            <Menu size={20} />
+          </button>
         </div>
 
-        <nav className="sidebar-nav" style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
+        <nav className="sidebar-nav" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: isSidebarOpen ? '0 12px' : '0 4px' }}>
           {menuItems.map((item) => {
             const isActive = location.pathname === item.rota
             return (
@@ -2061,55 +2206,106 @@ function Layout({
                 key={item.nome}
                 to={item.rota}
                 className={`nav-link ${isActive ? 'active' : ''}`}
-                style={{ fontSize: '13px', padding: '9px 14px' }}
+                style={{ 
+                  padding: isSidebarOpen ? '10px 14px' : '14px', 
+                  justifyContent: isSidebarOpen ? 'flex-start' : 'center',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: isSidebarOpen ? '14px' : '0',
+                  marginBottom: '6px'
+                }}
+                title={!isSidebarOpen ? item.nome : undefined}
               >
-                {item.icone}
-                <span>{item.nome}</span>
+                <motion.div 
+                  whileHover={!isSidebarOpen ? { scale: 1.25, rotate: 2 } : {}} 
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+                  style={{ flexShrink: 0, display: 'flex' }}
+                >
+                  {item.icone}
+                </motion.div>
+                <AnimatePresence>
+                  {isSidebarOpen && (
+                    <motion.span
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: 'auto' }}
+                      exit={{ opacity: 0, width: 0 }}
+                      style={{ whiteSpace: 'nowrap', fontSize: '14px' }}
+                    >
+                      {item.nome}
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </Link>
             )
           })}
         </nav>
 
         {/* Rodapé do Sidebar com identificação profissional e botão de bloqueio */}
-        <div style={{ padding: '14px 16px', borderTop: '1px solid #1e293b', background: '#090d16' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: isSidebarOpen ? '14px 16px' : '14px 0', borderTop: '1px solid var(--sidebar-hover)', background: 'var(--sidebar-bg)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: isSidebarOpen ? 'space-between' : 'center', flexDirection: isSidebarOpen ? 'row' : 'column', gap: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div
+                title={!isSidebarOpen ? config?.nomeProfissional || 'Dr(a). Terapeuta' : undefined}
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '8px',
-                  background: '#1e293b',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: 'var(--sidebar-hover)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#60a5fa'
+                  color: 'var(--primary-light)',
+                  flexShrink: 0
                 }}
               >
-                <UserCircle2 size={18} />
+                <UserCircle2 size={20} />
               </div>
-              <div style={{ overflow: 'hidden' }}>
-                <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                  {config?.nomeProfissional || 'Dr(a). Terapeuta'}
-                </p>
-                <span style={{ fontSize: '11px', color: '#94a3b8' }}>CRP {config?.crp || '06/123456'}</span>
-              </div>
+              
+              <AnimatePresence>
+                {isSidebarOpen && (
+                  <motion.div 
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 'auto' }}
+                    exit={{ opacity: 0, width: 0 }}
+                    style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}
+                  >
+                    <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'var(--bg-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                      {config?.nomeProfissional || 'Dr(a). Terapeuta'}
+                    </p>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>CRP {config?.crp || '06/123456'}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.95 }}
               onClick={onLock}
               className="btn btn-icon-only"
-              style={{ color: '#94a3b8', padding: '6px' }}
+              style={{ color: 'var(--text-muted)', padding: '6px' }}
               title="Bloquear tela (Proteção de Sigilo)"
             >
-              <Lock size={15} />
-            </button>
+              <Lock size={18} />
+            </motion.button>
           </div>
         </div>
-      </aside>
+      </motion.aside>
 
-      <main style={{ flex: 1, overflowY: 'auto', position: 'relative', background: '#f8fafc' }}>
-        {children}
+      <main style={{ flex: 1, overflowY: 'auto', position: 'relative', background: 'var(--bg-main)' }}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            style={{ minHeight: '100%', display: 'flex', flexDirection: 'column' }}
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   )

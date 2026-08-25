@@ -1,13 +1,18 @@
 import dotenv from 'dotenv';
-dotenv.config({ path: 'env.txt' });
-import express from 'express';
 import path from 'path';
+
+const envPath = typeof __dirname !== 'undefined' 
+  ? path.join(__dirname, '../env.txt') 
+  : 'env.txt';
+dotenv.config({ path: envPath });
+
+import express from 'express';
 import OpenAI from 'openai';
 // Vite import will be dynamic to avoid require('vite') in production
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = 0; // OS escolhe porta aleatória livre para evitar conflitos no desktop
 
   app.use(express.json({ limit: '10mb' }));
 
@@ -264,7 +269,8 @@ Mantenha tom estritamente técnico, ético, objetivo e respeitoso. Não adicione
   }
 
   const server = app.listen(PORT, '127.0.0.1', () => {
-    console.log(`Servidor Clínico Seguro rodando em http://127.0.0.1:${PORT}`);
+    const addr = server.address() as any;
+    console.log(`Servidor Clínico Seguro rodando em http://127.0.0.1:${addr.port}`);
   });
 
   server.on('error', (e: any) => {

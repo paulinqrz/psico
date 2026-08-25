@@ -5,18 +5,19 @@ const { spawn } = require('child_process');
 let mainWindow;
 let serverProcess;
 
-function createWindow() {
+function createWindow(serverUrl) {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     title: "Márcia Helena - Psicologia",
     autoHideMenuBar: true,
     webPreferences: {
-      nodeIntegration: true
+      nodeIntegration: false,
+      contextIsolation: true
     }
   });
   
-  mainWindow.loadURL('http://localhost:3000');
+  mainWindow.loadURL(serverUrl || 'http://127.0.0.1:3000');
   
   mainWindow.on('closed', function () {
     mainWindow = null;
@@ -26,24 +27,24 @@ function createWindow() {
 app.on('ready', () => {
   // Inicializa o servidor backend Node
   const serverPath = path.join(__dirname, 'dist', 'server.cjs');
-  serverProcess = spawn('node', [serverPath]);
+  serverProcess = spawn('node', [serverPath], {
+    env: { ...process.env, NODE_ENV: 'production' }
+  });
   
   serverProcess.stdout.on('data', (data) => {
-    console.log(`Server: ${data}`);
-    // Espera o servidor subir na porta 3000 para abrir a tela
-    if (data.toString().includes('3000') || data.toString().includes('running')) {
-      if (!mainWindow) createWindow();
+    const output = data.toString();
+    console.log(`Server: ${output}`);
+    
+    // Procura a url onde o servidor iniciou
+    const match = output.match(/http:\/\/127\.0\.0\.1:(\d+)/);
+    if (match) {
+      if (!mainWindow) createWindow(match[0]);
     }
   });
   
   serverProcess.stderr.on('data', (data) => {
     console.error(`Server Error: ${data}`);
   });
-
-  // Fallback: se não capturar a mensagem, abre a tela em 3 segundos
-  setTimeout(() => {
-    if (!mainWindow) createWindow();
-  }, 3000);
 });
 
 app.on('window-all-closed', function () {
