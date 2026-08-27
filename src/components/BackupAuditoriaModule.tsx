@@ -6,20 +6,14 @@ import {
   Upload,
   ShieldCheck,
   History,
-  Trash2,
-  Check,
-  AlertCircle,
-  FileCode,
-  HardDrive
+  Check
 } from 'lucide-react'
 import { LogAuditoria, ConfiguracoesApp } from '../types'
 
 export const BackupAuditoriaModule: React.FC = () => {
   const [logs, setLogs] = useState<LogAuditoria[]>([])
   const [config, setConfig] = useState<ConfiguracoesApp | null>(null)
-  const [filtroCategoria, setFiltroCategoria] = useState('TODAS');
-  const [toastMessage, setToastMessage] = useState("");
-  const [toastVisible, setToastVisible] = useState(false);
+  const [filtroCategoria, setFiltroCategoria] = useState('TODAS')
   const [confirmarRestaure, setConfirmarRestaure] = useState<{conteudo: string} | null>(null)
   const [toastMsg, setToastMsg] = useState('')
 
@@ -90,48 +84,8 @@ export const BackupAuditoriaModule: React.FC = () => {
         >
           <Check size={18} color="#10b981" />
           <span style={{ fontSize: '13px', fontWeight: 500 }}>{toastMsg}</span>
-              <ConfirmModal
-        isOpen={!!confirmarRestaure}
-        title="Restaurar Backup"
-        message="Atenção: A restauração irá substituir a base de dados atual pelo backup selecionado. Deseja prosseguir?"
-        onCancel={() => setConfirmarRestaure(null)}
-        onConfirm={async () => {
-          if (confirmarRestaure) {
-            try {
-              await window.api.backup.importar(confirmarRestaure.conteudo)
-              setToastMessage('Backup restaurado com sucesso! Recarregando...')
-              setToastVisible(true)
-              setTimeout(() => window.location.reload(), 2000)
-            } catch (e) {
-              setToastMessage('Erro ao restaurar arquivo. Formato inválido.')
-              setToastVisible(true)
-              setTimeout(() => setToastVisible(false), 3000)
-            }
-            setConfirmarRestaure(null)
-          }
-        }}
-      />
-          <ConfirmModal
-        isOpen={!!confirmarRestaure}
-        title="Restaurar Backup"
-        message="Atenção: A restauração irá substituir a base de dados atual pelo backup selecionado. Deseja prosseguir?"
-        onCancel={() => setConfirmarRestaure(null)}
-        onConfirm={async () => {
-          if (confirmarRestaure) {
-            const ok = await (window as any).api.backup.restaurarDados(confirmarRestaure.conteudo)
-            if (ok) {
-              await carregarDados()
-              mostrarToast('Base de dados e prontuários restaurados com sucesso!')
-            } else {
-              mostrarToast('Arquivo de backup corrompido ou incompatível.')
-            }
-            setConfirmarRestaure(null)
-          }
-        }}
-      />
-    </div>
-  )
-}
+        </div>
+      )}
 
       {/* Header */}
       <div
@@ -314,6 +268,25 @@ export const BackupAuditoriaModule: React.FC = () => {
         </div>
 
       </div>
+
+      <ConfirmModal
+        isOpen={!!confirmarRestaure}
+        title="Restaurar Backup"
+        message="Atenção: A restauração irá substituir a base de dados atual pelo backup selecionado. Deseja prosseguir?"
+        onCancel={() => setConfirmarRestaure(null)}
+        onConfirm={async () => {
+          if (confirmarRestaure) {
+            const ok = await (window as any).api.backup.restaurarDados(confirmarRestaure.conteudo)
+            if (ok) {
+              await carregarDados()
+              mostrarToast('Base de dados e prontuários restaurados com sucesso!')
+            } else {
+              mostrarToast('Arquivo de backup corrompido ou incompatível.')
+            }
+            setConfirmarRestaure(null)
+          }
+        }}
+      />
     </div>
   )
 }

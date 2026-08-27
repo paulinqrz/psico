@@ -3,7 +3,6 @@ import { ConfirmModal } from './ConfirmModal'
 import {
   ClipboardList,
   Plus,
-  FileText,
   Search,
   Trash2,
   X,
@@ -131,22 +130,8 @@ export const AvaliacoesModule: React.FC = () => {
         >
           <Check size={18} color="#10b981" />
           <span style={{ fontSize: '13px', fontWeight: 500 }}>{toastMsg}</span>
-              <ConfirmModal
-        isOpen={!!avaliacaoExcluir}
-        title="Excluir Avaliação"
-        message="Deseja excluir esta avaliação psicológica do prontuário?"
-        onCancel={() => setAvaliacaoExcluir(null)}
-        onConfirm={async () => {
-          if (avaliacaoExcluir) {
-            await window.api.avaliacoes.excluir(avaliacaoExcluir)
-            setAvaliacaoExcluir(null)
-            carregarDados()
-          }
-        }}
-      />
-    </div>
-  )
-}
+        </div>
+      )}
 
       {/* Header */}
       <div
@@ -406,6 +391,21 @@ export const AvaliacoesModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!avaliacaoExcluir}
+        title="Excluir Avaliação"
+        message="Deseja excluir esta avaliação psicológica do prontuário?"
+        onCancel={() => setAvaliacaoExcluir(null)}
+        onConfirm={async () => {
+          if (avaliacaoExcluir) {
+            await window.api.avaliacoes.excluir(avaliacaoExcluir)
+            setAvaliacaoExcluir(null)
+            carregarDados()
+            mostrarToast('Avaliação psicológica excluída com sucesso!')
+          }
+        }}
+      />
     </div>
   )
 }

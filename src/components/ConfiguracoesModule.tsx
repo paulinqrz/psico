@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import {
-  Settings,
   Shield,
-  KeyRound,
   User,
-  Building,
   Save,
   Check,
   Lock,
@@ -17,7 +14,6 @@ interface ConfiguracoesModuleProps {
 }
 
 export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({ onLockNow }) => {
-  const [config, setConfig] = useState<ConfiguracoesApp | null>(null)
   const [nomeProfissional, setNomeProfissional] = useState('')
   const [crp, setCrp] = useState('')
   const [especialidade, setEspecialidade] = useState('')
@@ -28,8 +24,7 @@ export const ConfiguracoesModule: React.FC<ConfiguracoesModuleProps> = ({ onLock
   const [toastMsg, setToastMsg] = useState('')
 
   const carregarDados = async () => {
-    const c = await (window as any).api.config.obter()
-    setConfig(c)
+    const c: ConfiguracoesApp = await (window as any).api.config.obter()
     setNomeProfissional(c.nomeProfissional || '')
     setCrp(c.crp || '')
     setEspecialidade(c.especialidade || '')

@@ -822,6 +822,12 @@ export const api = {
       await setItem(STORAGE_KEYS.ANALISES_IA, lista)
       registrarLog('Revisão de IA', 'IA', `Status atualizado para "${status}"`, lista[idx].pacienteId)
       return lista[idx]
+    },
+    excluir: async (id: string): Promise<boolean> => {
+      const lista = await getItem<AnaliseIA[]>(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA)
+      await setItem(STORAGE_KEYS.ANALISES_IA, lista.filter(a => a.id !== id))
+      registrarLog('Excluir Análise IA', 'IA', `Registro de análise de IA removido`)
+      return true
     }
   },
 

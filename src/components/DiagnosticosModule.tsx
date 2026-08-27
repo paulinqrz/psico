@@ -5,8 +5,6 @@ import {
   Plus,
   Search,
   BookOpen,
-  CheckCircle2,
-  AlertCircle,
   X,
   Trash2,
   Save,
@@ -141,22 +139,8 @@ export const DiagnosticosModule: React.FC = () => {
         >
           <Check size={18} color="#10b981" />
           <span style={{ fontSize: '13px', fontWeight: 500 }}>{toastMsg}</span>
-              <ConfirmModal
-        isOpen={!!diagExcluir}
-        title="Remover Diagnóstico"
-        message="Tem certeza que deseja remover este registro diagnóstico do prontuário?"
-        onCancel={() => setDiagExcluir(null)}
-        onConfirm={async () => {
-          if (diagExcluir) {
-            await window.api.diagnosticos.excluir(diagExcluir)
-            setDiagExcluir(null)
-            carregarDados()
-          }
-        }}
-      />
-    </div>
-  )
-}
+        </div>
+      )}
 
       {/* Header */}
       <div
@@ -491,6 +475,21 @@ export const DiagnosticosModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!diagExcluir}
+        title="Remover Diagnóstico"
+        message="Tem certeza que deseja remover este registro diagnóstico do prontuário?"
+        onCancel={() => setDiagExcluir(null)}
+        onConfirm={async () => {
+          if (diagExcluir) {
+            await window.api.diagnosticos.excluir(diagExcluir)
+            setDiagExcluir(null)
+            carregarDados()
+            mostrarToast('Registro diagnóstico excluído com sucesso!')
+          }
+        }}
+      />
     </div>
   )
 }

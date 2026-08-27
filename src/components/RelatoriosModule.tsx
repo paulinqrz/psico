@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
-  FileText,
-  Printer,
-  Download,
-  Check,
-  User,
-  Calendar,
-  Building,
-  ShieldCheck,
-  FileBadge
+  Printer
 } from 'lucide-react'
 import { Paciente, Sessao, Diagnostico, ConfiguracoesApp } from '../types'
 

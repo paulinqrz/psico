@@ -18,13 +18,20 @@
 body, html, #root {
   margin: 0;
   padding: 0;
-  height: 100vh;
+  height: 100%;
+  min-height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background: var(--bg-main);
+  background-color: var(--bg-main);
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-main);
 }
 
 h1, h2, h3, h4, h5, h6, .title, .sidebar-brand h2 {
@@ -40,6 +47,10 @@ h1, h2, h3, h4, h5, h6, .title, .sidebar-brand h2 {
 .page-enter {
   animation: fadeSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-main);
 }
 
 @keyframes fadeSlideUp {
@@ -532,6 +543,10 @@ h1, h2, h3, h4, h5, h6, .title, .sidebar-brand h2 {
   padding: 14px 18px;
   border-bottom: 1px solid var(--border-subtle);
   vertical-align: middle;
+}
+
+.modern-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .modern-table tbody tr {

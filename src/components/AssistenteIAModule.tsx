@@ -3,7 +3,6 @@ import {
   Sparkles,
   ShieldCheck,
   CheckCircle2,
-  AlertTriangle,
   FileSearch,
   BookOpen,
   Send,
@@ -12,10 +11,12 @@ import {
   HelpCircle,
   XCircle,
   FileCheck,
-  MessageSquare
+  MessageSquare,
+  Trash2
 } from 'lucide-react'
 import { AnaliseIA, Paciente, Sessao, StatusRevisaoIA } from '../types'
 import { anonimizarTextoClinico } from '../services/api'
+import { ConfirmModal } from './ConfirmModal'
 
 export const AssistenteIAModule: React.FC = () => {
   const [analises, setAnalises] = useState<AnaliseIA[]>([])
@@ -26,7 +27,7 @@ export const AssistenteIAModule: React.FC = () => {
   const [textoEntrada, setTextoEntrada] = useState('')
   const [carregando, setCarregando] = useState(false)
   const [toastMsg, setToastMsg] = useState('')
-  const [consentModalAberto, setConsentModalAberto] = useState(false)
+  const [analiseParaExcluir, setAnaliseParaExcluir] = useState<string | null>(null)
   const [analiseSelecionada, setAnaliseSelecionada] = useState<AnaliseIA | null>(null)
   const [obsRevisao, setObsRevisao] = useState('')
   const [activeTab, setActiveTab] = useState<'analise' | 'chat'>('chat') // Defaulting to chat tab
@@ -88,25 +89,6 @@ export const AssistenteIAModule: React.FC = () => {
         textoAnonimizado
       )
       
-      await carregarDados()
-      setAnaliseSelecionada(novaAnalise)
-      mostrarToast('Análise clínica gerada pela IA e pronta para sua revisão profissional.')
-    } catch (e) {
-      mostrarToast('Falha na comunicação com o assistente.')
-    } finally {
-      setCarregando(false)
-    }
-  }
-
-  const handleConfirmarEnvioAnonimizado = async (textoAnonimizado: string) => {
-    setConsentModalAberto(false)
-    setCarregando(true)
-    try {
-      const novaAnalise = await (window as any).api.ia.solicitarAnalise(
-        selectedPacienteId,
-        tipoAnalise,
-        textoAnonimizado
-      )
       await carregarDados()
       setAnaliseSelecionada(novaAnalise)
       mostrarToast('Análise clínica gerada pela IA e pronta para sua revisão profissional.')
@@ -429,22 +411,45 @@ export const AssistenteIAModule: React.FC = () => {
                       <span style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>
                         {getNomePaciente(a.pacienteId)}
                       </span>
-                      <span
-                        className={`badge ${
-                          a.statusRevisao === 'aprovado'
-                            ? 'badge-green'
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span
+                          className={`badge ${
+                            a.statusRevisao === 'aprovado'
+                              ? 'badge-green'
+                              : a.statusRevisao === 'revisado'
+                              ? 'badge-blue'
+                              : 'badge-yellow'
+                          }`}
+                          style={{ fontSize: '10px', padding: '2px 6px' }}
+                        >
+                          {a.statusRevisao === 'aprovado'
+                            ? 'Aprovado'
                             : a.statusRevisao === 'revisado'
-                            ? 'badge-blue'
-                            : 'badge-yellow'
-                        }`}
-                        style={{ fontSize: '10px', padding: '2px 6px' }}
-                      >
-                        {a.statusRevisao === 'aprovado'
-                          ? 'Aprovado'
-                          : a.statusRevisao === 'revisado'
-                          ? 'Revisado'
-                          : 'Aguardando Revisão'}
-                      </span>
+                            ? 'Revisado'
+                            : 'Aguardando Revisão'}
+                        </span>
+                        <button
+                          type="button"
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#94a3b8',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = '#ef4444')}
+                          onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = '#94a3b8')}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setAnaliseParaExcluir(a.id)
+                          }}
+                          title="Excluir Análise"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                     <div style={{ fontSize: '11px', color: '#64748b' }}>
                       {a.resultado.condicao || a.tipoAnalise} • {new Date(a.data).toLocaleDateString('pt-BR')}
@@ -646,6 +651,24 @@ export const AssistenteIAModule: React.FC = () => {
 
       </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!analiseParaExcluir}
+        title="Excluir Análise de IA"
+        message="Deseja remover este registro de análise clínica do histórico?"
+        onCancel={() => setAnaliseParaExcluir(null)}
+        onConfirm={async () => {
+          if (analiseParaExcluir) {
+            await (window as any).api.ia.excluir(analiseParaExcluir)
+            if (analiseSelecionada?.id === analiseParaExcluir) {
+              setAnaliseSelecionada(null)
+            }
+            setAnaliseParaExcluir(null)
+            carregarDados()
+            mostrarToast('Registro de análise excluído com sucesso.')
+          }
+        }}
+      />
     </div>
   )
 }

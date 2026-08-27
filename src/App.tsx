@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { HashRouter, Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
 import {
   LayoutDashboard,
@@ -16,8 +16,6 @@ import {
   Trash2,
   UserCircle2,
   Phone,
-  Mail,
-  MapPin,
   CheckCircle,
   Clock,
   CalendarDays,
@@ -30,12 +28,7 @@ import {
   ClipboardList,
   FileBadge2,
   Database,
-  Settings,
-  LogOut,
-  ShieldCheck,
-  Building2,
-  Activity,
-  FileCheck
+  Settings
 } from 'lucide-react'
 
 // Import de módulos especializados da arquitetura clínica profissional
@@ -349,7 +342,7 @@ function Dashboard() {
 // --- PERFIL COMPLETO DO PACIENTE ---
 function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
   const [paciente, setPaciente] = useState<any>(null)
-      const [nome, setNome] = useState('')
+  const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
   const [cpf, setCpf] = useState('')
   const [endereco, setEndereco] = useState('')
@@ -357,7 +350,6 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
   const [queixa, setQueixa] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [toastVisible, setToastVisible] = useState(false)
-  const [confirmarExclusao, setConfirmarExclusao] = useState(false)
 
   useEffect(() => {
     window.api.pacientes.obter(id).then((dados: any) => {
@@ -392,7 +384,7 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
   const salvarDetalhes = async (e: React.FormEvent) => {
     e.preventDefault()
     setSalvando(true)
-    await window.api.pacientes.atualizar(id, { nome, telefone, cpf, profissao, queixa })
+    await window.api.pacientes.atualizar(id, { nome, telefone, cpf, endereco, profissao, queixa })
     setSalvando(false)
     setToastVisible(true)
     setTimeout(() => setToastVisible(false), 3000)
@@ -487,6 +479,17 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
                 value={profissao}
                 onChange={(e) => setProfissao(e.target.value)}
                 placeholder="Ex: Engenheiro de Software"
+              />
+            </div>
+
+            <div className="input-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Endereço Residencial</label>
+              <input
+                type="text"
+                className="input"
+                value={endereco}
+                onChange={(e) => setEndereco(e.target.value)}
+                placeholder="Rua, Número, Bairro, Cidade - UF"
               />
             </div>
             
@@ -627,9 +630,7 @@ function TelaPacientes() {
   const [pacienteParaExcluir, setPacienteParaExcluir] = useState<string | null>(null)
   const [modoForm, setModoForm] = useState(false)
   const [pacienteSelecionado, setPacienteSelecionado] = useState<string | null>(null)
-  const [nome, setNome] = useState('')
-    const [telefone, setTelefone] = useState('')
-    const [toastVisible, setToastVisible] = useState(false)
+  const [toastVisible, setToastVisible] = useState(false)
 
   const carregarPacientes = async () => {
     const dados = await window.api.pacientes.listar()
@@ -1085,8 +1086,8 @@ function ListaSessoesPaciente({
 
   // Form states for new session
   const [dataSessao, setDataSessao] = useState(new Date().toISOString().slice(0, 16))
-  const [resumo, setResumo] = useState('');
-  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  const [resumo, setResumo] = useState('')
+  const [sessaoExcluirId, setSessaoExcluirId] = useState<string | null>(null)
   const [anotacoes, setAnotacoes] = useState('')
   const [toastVisible, setToastVisible] = useState(false)
 
@@ -1397,9 +1398,34 @@ Próximos Passos (Para casa):
                       {dataFormatada} às {horaFormatada}
                     </span>
                   </div>
-                  <span className="badge badge-slate">
-                    Sessão #{sessoes.length - index}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="badge badge-slate">
+                      Sessão #{sessoes.length - index}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-icon-only"
+                      style={{
+                        padding: '4px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#94a3b8',
+                        cursor: 'pointer',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.color = '#ef4444')}
+                      onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.color = '#94a3b8')}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSessaoExcluirId(s.id)
+                      }}
+                      title="Excluir Sessão"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Main clickable title / theme requested by the user */}
@@ -1424,6 +1450,20 @@ Próximos Passos (Para casa):
           })}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!sessaoExcluirId}
+        title="Excluir Sessão"
+        message="Tem certeza que deseja excluir o registro desta sessão clínica?"
+        onCancel={() => setSessaoExcluirId(null)}
+        onConfirm={async () => {
+          if (sessaoExcluirId) {
+            await window.api.sessoes.excluir(sessaoExcluirId)
+            setSessaoExcluirId(null)
+            carregarDados()
+          }
+        }}
+      />
     </div>
   )
 }
@@ -1580,559 +1620,6 @@ function TelaSessoesMain() {
   )
 }
 
-// --- TELA AGENDA (SEMANAL SEGUNDA A SEXTA) ---
-function TelaAgenda() {
-  const [semanaOffset, setSemanaOffset] = useState(0)
-  const [sessoes, setSessoes] = useState<any[]>([])
-  const [pacientes, setPacientes] = useState<any[]>([])
-  const [novoModalAberto, setNovoModalAberto] = useState(false)
-  const [slotDataHora, setSlotDataHora] = useState('')
-  const [selectedPacienteId, setSelectedPacienteId] = useState('')
-  const [sessaoResumo, setSessaoResumo] = useState('')
-  const [sessaoAnotacoes, setSessaoAnotacoes] = useState('')
-  const [toastVisible, setToastVisible] = useState(false)
-  const [sessaoModalDetalhe, setSessaoModalDetalhe] = useState<any>(null)
-  const [sessaoParaExcluir, setSessaoParaExcluir] = useState<any>(null)
-  const [editandoDataHora, setEditandoDataHora] = useState('')
-  const [editandoResumo, setEditandoResumo] = useState('')
-  const [editandoAnotacoes, setEditandoAnotacoes] = useState('')
-  const [salvandoEdicao, setSalvandoEdicao] = useState(false)
-
-  const carregarDados = async () => {
-    const s = await window.api.sessoes.todas()
-    setSessoes(s)
-    const p = await window.api.pacientes.listar()
-    setPacientes(p)
-  }
-
-  useEffect(() => {
-    carregarDados()
-  }, [])
-
-  // Calcular a segunda-feira da semana atual com base no offset
-  const hoje = new Date()
-  const diaSemanaHoje = hoje.getDay() // 0 = Domingo, 1 = Segunda, ...
-  const diffSegunda = diaSemanaHoje === 0 ? -6 : 1 - diaSemanaHoje
-  
-  const segundaFeira = new Date(hoje)
-  segundaFeira.setDate(hoje.getDate() + diffSegunda + semanaOffset * 7)
-  segundaFeira.setHours(0, 0, 0, 0)
-
-  // Dias de segunda a sexta (5 dias)
-  const diasDaSemana = [0, 1, 2, 3, 4].map((offset) => {
-    const data = new Date(segundaFeira)
-    data.setDate(segundaFeira.getDate() + offset)
-    return data
-  })
-
-  const nomesDias = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira']
-
-  // Identificar se um dia é "hoje"
-  const isMesmoDia = (d1: Date, d2: Date) => {
-    return (
-      d1.getFullYear() === d2.getFullYear() &&
-      d1.getMonth() === d2.getMonth() &&
-      d1.getDate() === d2.getDate()
-    )
-  }
-
-  // Agrupar sessões por dia da semana
-  const sessoesPorDia = diasDaSemana.map((dia) => {
-    return sessoes.filter((s) => {
-      const dataSessao = new Date(s.dataSessao)
-      return isMesmoDia(dataSessao, dia)
-    }).sort((a, b) => new Date(a.dataSessao).getTime() - new Date(b.dataSessao).getTime())
-  })
-
-  // Total de sessões na semana selecionada
-  const totalSessoesSemana = sessoesPorDia.reduce((acc, curr) => acc + curr.length, 0)
-
-  const formatarIntervaloSemana = () => {
-    const seg = diasDaSemana[0]
-    const sex = diasDaSemana[4]
-    const diaInicio = seg.getDate()
-    const mesInicio = seg.toLocaleDateString('pt-BR', { month: 'short' })
-    const diaFim = sex.getDate()
-    const mesFim = sex.toLocaleDateString('pt-BR', { month: 'short' })
-    const ano = sex.getFullYear()
-    return `${diaInicio} de ${mesInicio} a ${diaFim} de ${mesFim}, ${ano}`
-  }
-
-  const abrirModalNovoAgendamento = (dataDefault?: Date, horaDefault = '09:00') => {
-    const base = dataDefault ? new Date(dataDefault) : new Date()
-    const [h, m] = horaDefault.split(':').map(Number)
-    base.setHours(h, m, 0, 0)
-    
-    // Ajustar para formato datetime-local ISO local
-    const tzOffset = base.getTimezoneOffset() * 60000
-    const localISOTime = new Date(base.getTime() - tzOffset).toISOString().slice(0, 16)
-    
-    setSlotDataHora(localISOTime)
-    setSelectedPacienteId(pacientes[0]?.id || '')
-    setSessaoResumo('')
-    setSessaoAnotacoes('')
-    setNovoModalAberto(true)
-  }
-
-  const salvarAgendamento = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!selectedPacienteId) return
-    await window.api.sessoes.criar({
-      pacienteId: selectedPacienteId,
-      dataSessao: new Date(slotDataHora).toISOString(),
-      resumo: sessaoResumo || 'Sessão de Psicoterapia',
-      anotacoes: sessaoAnotacoes
-    })
-    setNovoModalAberto(false)
-    await carregarDados()
-    setToastVisible(true)
-    setTimeout(() => setToastVisible(false), 3000)
-  }
-
-  const abrirDetalheSessao = (sessao: any) => {
-    setSessaoModalDetalhe(sessao)
-    setEditandoDataHora(sessao.dataSessao ? sessao.dataSessao.slice(0, 16) : '')
-    setEditandoResumo(sessao.resumo || '')
-    setEditandoAnotacoes(sessao.anotacoes || '')
-  }
-
-  const salvarEdicaoSessao = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!sessaoModalDetalhe) return
-    setSalvandoEdicao(true)
-    await window.api.sessoes.atualizar(sessaoModalDetalhe.id, {
-      dataSessao: new Date(editandoDataHora).toISOString(),
-      resumo: editandoResumo,
-      anotacoes: editandoAnotacoes
-    })
-    setSalvandoEdicao(false)
-    setSessaoModalDetalhe(null)
-    await carregarDados()
-    setToastVisible(true)
-    setTimeout(() => setToastVisible(false), 3000)
-  }
-
-  const excluirSessaoAgenda = async () => {
-    if (!sessaoModalDetalhe) return
-    setSessaoParaExcluir(sessaoModalDetalhe)
-  }
-
-  const obterNomePaciente = (pacienteId: string) => {
-    const p = pacientes.find((item) => item.id === pacienteId)
-    return p ? p.nome : 'Paciente'
-  }
-
-  return (
-    <div key="agenda-page" className="page-enter" style={{ padding: '36px 40px' }}>
-      <Toast message="Agenda atualizada com sucesso!" visible={toastVisible} onClose={() => setToastVisible(false)} />
-
-      {/* Header com Navegação de Semana */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '26px',
-          flexWrap: 'wrap',
-          gap: '16px'
-        }}
-      >
-        <div>
-          <h1 className="title">Agenda Semanal</h1>
-          <p className="subtitle">Visualização de consultas e atendimentos de Segunda a Sexta-feira</p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <AnimatePresence>
-            {semanaOffset !== 0 && (
-              <motion.button 
-                initial={{ opacity: 0, width: 0, scale: 0.8 }}
-                animate={{ opacity: 1, width: 'auto', scale: 1 }}
-                exit={{ opacity: 0, width: 0, scale: 0.8 }}
-                onClick={() => setSemanaOffset(0)} 
-                className="btn btn-secondary"
-                style={{ whiteSpace: 'nowrap', padding: '8px 16px', fontSize: '13px', overflow: 'hidden' }}
-              >
-                Voltar para Hoje
-              </motion.button>
-            )}
-          </AnimatePresence>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              background: '#ffffff',
-              border: '1px solid #cbd5e1',
-              borderRadius: '8px',
-              padding: '3px'
-            }}
-          >
-            <button
-              onClick={() => setSemanaOffset((prev) => prev - 1)}
-              className="btn btn-icon-only"
-              title="Semana anterior"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <span 
-              style={{ 
-                fontSize: '13px', 
-                fontWeight: 600, 
-                color: '#334155', 
-                padding: '0 12px', 
-                minWidth: '150px', 
-                textAlign: 'center' 
-              }}
-            >
-              {formatarIntervaloSemana()}
-            </span>
-            <button
-              onClick={() => setSemanaOffset((prev) => prev + 1)}
-              className="btn btn-icon-only"
-              title="Próxima semana"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-
-          <button onClick={() => abrirModalNovoAgendamento()} className="btn btn-accent">
-            <Plus size={18} /> Agendar Atendimento
-          </button>
-        </div>
-      </div>
-
-      {/* Subheader com dados da semana */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '18px',
-          background: '#ffffff',
-          padding: '14px 20px',
-          borderRadius: '10px',
-          border: '1px solid #e2e8f0'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <CalendarDays size={18} color="#2563eb" />
-          <span style={{ fontSize: '15px', fontWeight: 600, color: '#0f172a', textTransform: 'capitalize' }}>
-            Resumo Semanal
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="badge badge-blue">
-            {totalSessoesSemana} {totalSessoesSemana === 1 ? 'atendimento na semana' : 'atendimentos na semana'}
-          </span>
-        </div>
-      </div>
-
-      {/* Colunas dos 5 Dias: Segunda a Sexta */}
-      <div className="agenda-grid">
-        {diasDaSemana.map((dia, idx) => {
-          const eHoje = isMesmoDia(dia, hoje)
-          const sessoesDia = sessoesPorDia[idx]
-
-          return (
-            <div key={idx} className={`agenda-day-col ${eHoje ? 'is-today' : ''}`}>
-              <div className="agenda-day-header">
-                <div>
-                  <div className="agenda-day-title">{nomesDias[idx]}</div>
-                  <div className="agenda-day-date">
-                    {dia.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                  </div>
-                </div>
-                <button
-                  onClick={() => abrirModalNovoAgendamento(dia, '10:00')}
-                  className="btn btn-icon-only"
-                  style={{ padding: '4px 6px', color: '#2563eb' }}
-                  title={`Agendar na ${nomesDias[idx]}`}
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
-
-              <div className="agenda-slots-list">
-                {sessoesDia.length === 0 ? (
-                  <div className="agenda-empty-day">
-                    <Clock size={20} style={{ opacity: 0.3 }} />
-                    <span>Nenhum atendimento agendado</span>
-                    <button
-                      onClick={() => abrirModalNovoAgendamento(dia, '09:00')}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#2563eb',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: '4px'
-                      }}
-                    >
-                      + Horário
-                    </button>
-                  </div>
-                ) : (
-                  sessoesDia.map((sessao) => {
-                    const horaFormatada = new Date(sessao.dataSessao).toLocaleTimeString('pt-BR', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })
-                    const nomePac = obterNomePaciente(sessao.pacienteId)
-
-                    return (
-                      <div
-                        key={sessao.id}
-                        className="agenda-event-card"
-                        onClick={() => abrirDetalheSessao(sessao)}
-                        title="Clique para ver ou editar detalhes"
-                      >
-                        <div className="agenda-event-time">
-                          <Clock size={12} />
-                          <span>{horaFormatada}</span>
-                        </div>
-                        <div className="agenda-event-patient">{nomePac}</div>
-                        <div className="agenda-event-desc">
-                          {sessao.resumo || 'Sessão clínica'}
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* MODAL: NOVO AGENDAMENTO */}
-      {novoModalAberto && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-            padding: '20px'
-          }}
-        >
-          <div className="card page-enter" style={{ width: '100%', maxWidth: '500px', padding: '24px' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderBottom: '1px solid #f1f5f9',
-                paddingBottom: '14px',
-                marginBottom: '18px'
-              }}
-            >
-              <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-                Agendar Consulta
-              </h2>
-              <button onClick={() => setNovoModalAberto(false)} className="btn btn-icon-only">
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={salvarAgendamento}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div className="input-group">
-                  <label>Paciente *</label>
-                  <select
-                    className="input"
-                    value={selectedPacienteId}
-                    onChange={(e) => setSelectedPacienteId(e.target.value)}
-                    required
-                  >
-                    {pacientes.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nome}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="input-group">
-                  <label>Data e Horário do Atendimento *</label>
-                  <input
-                    type="datetime-local"
-                    className="input"
-                    value={slotDataHora}
-                    onChange={(e) => setSlotDataHora(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="input-group">
-                  <label>Tema / Resumo da Consulta</label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={sessaoResumo}
-                    onChange={(e) => setSessaoResumo(e.target.value)}
-                    placeholder="Ex: Acompanhamento quinzenal"
-                    required
-                  />
-                </div>
-
-                <div className="input-group">
-                  <label>Observações Prévias (Opcional)</label>
-                  <textarea
-                    className="input"
-                    rows={3}
-                    value={sessaoAnotacoes}
-                    onChange={(e) => setSessaoAnotacoes(e.target.value)}
-                    placeholder="Informações adicionais para este atendimento..."
-                  />
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  gap: '10px',
-                  marginTop: '22px',
-                  borderTop: '1px solid #f1f5f9',
-                  paddingTop: '16px'
-                }}
-              >
-                <button type="button" onClick={() => setNovoModalAberto(false)} className="btn btn-secondary">
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  <Save size={16} /> Confirmar Agendamento
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: VER / EDITAR AGENDAMENTO SELECIONADO */}
-      {sessaoModalDetalhe && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-            padding: '20px'
-          }}
-        >
-          <div className="card page-enter" style={{ width: '100%', maxWidth: '540px', padding: '24px' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                borderBottom: '1px solid #f1f5f9',
-                paddingBottom: '14px',
-                marginBottom: '18px'
-              }}
-            >
-              <div>
-                <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-                  Detalhes do Atendimento
-                </h2>
-                <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#64748b' }}>
-                  Paciente: <strong>{obterNomePaciente(sessaoModalDetalhe.pacienteId)}</strong>
-                </p>
-              </div>
-              <button onClick={() => setSessaoModalDetalhe(null)} className="btn btn-icon-only">
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={salvarEdicaoSessao}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div className="input-group">
-                  <label>Data e Horário</label>
-                  <input
-                    type="datetime-local"
-                    className="input"
-                    value={editandoDataHora}
-                    onChange={(e) => setEditandoDataHora(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="input-group">
-                  <label>Tema / Resumo da Sessão</label>
-                  <input
-                    type="text"
-                    className="input"
-                    value={editandoResumo}
-                    onChange={(e) => setEditandoResumo(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div className="input-group">
-                  <label>Anotações Clínicas</label>
-                  <textarea
-                    className="input"
-                    rows={5}
-                    value={editandoAnotacoes}
-                    onChange={(e) => setEditandoAnotacoes(e.target.value)}
-                    placeholder="Anotações e evolução clínica..."
-                  />
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: '22px',
-                  borderTop: '1px solid #f1f5f9',
-                  paddingTop: '16px'
-                }}
-              >
-                <button type="button" onClick={excluirSessaoAgenda} className="btn btn-danger-outline">
-                  <Trash2 size={16} /> Excluir
-                </button>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button type="button" onClick={() => setSessaoModalDetalhe(null)} className="btn btn-secondary">
-                    Fechar
-                  </button>
-                  <button type="submit" className="btn btn-primary" disabled={salvandoEdicao}>
-                    <Save size={16} /> {salvandoEdicao ? 'Salvando...' : 'Salvar Alterações'}
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      <ConfirmModal
-        isOpen={!!sessaoParaExcluir}
-        title="Excluir Sessão"
-        message="Tem certeza que deseja excluir esta sessão da agenda?"
-        onCancel={() => setSessaoParaExcluir(null)}
-        onConfirm={async () => {
-          if (sessaoParaExcluir) {
-            await window.api.sessoes.excluir(sessaoParaExcluir.id)
-            setSessaoParaExcluir(null)
-            setSessaoModalDetalhe(null)
-            carregarDados()
-          }
-        }}
-      />
-    </div>
-  )
-}
-
 // --- LAYOUT PRINCIPAL PROFISSIONAL ---
 function Layout({
   children,
@@ -2163,7 +1650,7 @@ function Layout({
   ]
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: 'var(--bg-main)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100%', minHeight: '100vh', background: 'var(--bg-main)', overflow: 'hidden' }}>
       <motion.aside 
         className="sidebar" 
         initial={false}
@@ -2308,7 +1795,7 @@ function Layout({
         </div>
       </motion.aside>
 
-      <main style={{ flex: 1, overflowY: 'auto', position: 'relative', background: 'var(--bg-main)' }}>
+      <main style={{ flex: 1, height: '100%', minHeight: '100vh', overflowY: 'auto', overflowX: 'hidden', position: 'relative', background: 'var(--bg-main)' }}>
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
@@ -2316,7 +1803,7 @@ function Layout({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            style={{ minHeight: '100%', display: 'flex', flexDirection: 'column' }}
+            style={{ minHeight: '100%', flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}
           >
             {children}
           </motion.div>

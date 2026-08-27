@@ -194,35 +194,8 @@ export const AgendaLifecycleModule: React.FC = () => {
         >
           <Check size={18} color="#10b981" />
           <span style={{ fontSize: '13px', fontWeight: 500 }}>{toastMsg}</span>
-              <ConfirmModal
-        isOpen={!!ausenciaConfirm}
-        title="Registrar Ausência"
-        message={"Confirmar registro de ausência para " + (ausenciaConfirm ? getNomePaciente(ausenciaConfirm.pacienteId) : "") + "?"}
-        onCancel={() => setAusenciaConfirm(null)}
-        onConfirm={async () => {
-          if (ausenciaConfirm) {
-            await window.api.consultas.marcarAusencia(ausenciaConfirm.id)
-            setAusenciaConfirm(null)
-            carregarDados()
-          }
-        }}
-      />
-      <ConfirmModal
-        isOpen={!!excluirConfirm}
-        title="Remover Agendamento"
-        message="Deseja realmente remover este agendamento?"
-        onCancel={() => setExcluirConfirm(null)}
-        onConfirm={async () => {
-          if (excluirConfirm) {
-            await window.api.consultas.excluir(excluirConfirm)
-            setExcluirConfirm(null)
-            carregarDados()
-          }
-        }}
-      />
-    </div>
-  )
-}
+        </div>
+      )}
 
       {/* Header */}
       <div
@@ -722,6 +695,38 @@ export const AgendaLifecycleModule: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!ausenciaConfirm}
+        title="Registrar Ausência"
+        message={"Confirmar registro de ausência para " + (ausenciaConfirm ? getNomePaciente(ausenciaConfirm.pacienteId) : "") + "?"}
+        onCancel={() => setAusenciaConfirm(null)}
+        onConfirm={async () => {
+          if (ausenciaConfirm) {
+            await window.api.consultas.marcarAusencia(ausenciaConfirm.id)
+            setAusenciaConfirm(null)
+            setModalDetalheConsulta(null)
+            carregarDados()
+            mostrarToast('Ausência registrada com sucesso.')
+          }
+        }}
+      />
+
+      <ConfirmModal
+        isOpen={!!excluirConfirm}
+        title="Remover Agendamento"
+        message="Deseja realmente remover este agendamento da agenda?"
+        onCancel={() => setExcluirConfirm(null)}
+        onConfirm={async () => {
+          if (excluirConfirm) {
+            await window.api.consultas.excluir(excluirConfirm)
+            setExcluirConfirm(null)
+            setModalDetalheConsulta(null)
+            carregarDados()
+            mostrarToast('Agendamento excluído com sucesso.')
+          }
+        }}
+      />
     </div>
   )
 }

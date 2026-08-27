@@ -1,1 +1,0 @@
-sed -i 's/const \[toastMsg, setToastMsg\] = useState('"''"')/const [toastMsg, setToastMsg] = useState('"''"');\n  const [ausenciaConfirm, setAusenciaConfirm] = useState<any>(null);\n  const [excluirConfirm, setExcluirConfirm] = useState<string | null>(null);/g' src/components/AgendaLifecycleModule.tsx
