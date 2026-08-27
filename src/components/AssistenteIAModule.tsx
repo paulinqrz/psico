@@ -15,7 +15,7 @@ import {
   MessageSquare
 } from 'lucide-react'
 import { AnaliseIA, Paciente, Sessao, StatusRevisaoIA } from '../types'
-import { ConsentPrivacyModal } from './ConsentPrivacyModal'
+import { anonimizarTextoClinico } from '../services/api'
 
 export const AssistenteIAModule: React.FC = () => {
   const [analises, setAnalises] = useState<AnaliseIA[]>([])
@@ -73,12 +73,29 @@ export const AssistenteIAModule: React.FC = () => {
     setTextoEntrada(queixaBase)
   }
 
-  const handleIniciarProcessoIA = () => {
+  const handleIniciarProcessoIA = async () => {
     if (!textoEntrada.trim()) {
       mostrarToast('Insira as observações ou contexto clínico para análise.')
       return
     }
-    setConsentModalAberto(true)
+
+    setCarregando(true)
+    try {
+      const textoAnonimizado = anonimizarTextoClinico(textoEntrada, pacienteAtual);
+      const novaAnalise = await (window as any).api.ia.solicitarAnalise(
+        selectedPacienteId,
+        tipoAnalise,
+        textoAnonimizado
+      )
+      
+      await carregarDados()
+      setAnaliseSelecionada(novaAnalise)
+      mostrarToast('Análise clínica gerada pela IA e pronta para sua revisão profissional.')
+    } catch (e) {
+      mostrarToast('Falha na comunicação com o assistente.')
+    } finally {
+      setCarregando(false)
+    }
   }
 
   const handleConfirmarEnvioAnonimizado = async (textoAnonimizado: string) => {
@@ -167,16 +184,6 @@ export const AssistenteIAModule: React.FC = () => {
           <span style={{ fontSize: '13px', fontWeight: 500 }}>{toastMsg}</span>
         </div>
       )}
-
-      {/* Modal de Anonimização e Consentimento */}
-      <ConsentPrivacyModal
-        isOpen={consentModalAberto}
-        tituloAcao={`Assistente Clínico IA (${tipoAnalise.replace(/_/g, ' ')})`}
-        paciente={pacienteAtual}
-        textoOriginal={textoEntrada}
-        onConfirm={handleConfirmarEnvioAnonimizado}
-        onCancel={() => setConsentModalAberto(false)}
-      />
 
       {/* Header */}
       <div

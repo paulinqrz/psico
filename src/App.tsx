@@ -42,6 +42,7 @@ import {
 import { AuthLockScreen } from './components/AuthLockScreen'
 import { AgendaLifecycleModule } from './components/AgendaLifecycleModule'
 import { DiagnosticosModule } from './components/DiagnosticosModule'
+import { ConfirmModal } from "./components/ConfirmModal";
 import { AvaliacoesModule } from './components/AvaliacoesModule'
 import { AssistenteIAModule } from './components/AssistenteIAModule'
 import { RelatoriosModule } from './components/RelatoriosModule'
@@ -348,21 +349,22 @@ function Dashboard() {
 // --- PERFIL COMPLETO DO PACIENTE ---
 function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
   const [paciente, setPaciente] = useState<any>(null)
+      const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
-  const [email, setEmail] = useState('')
   const [cpf, setCpf] = useState('')
   const [endereco, setEndereco] = useState('')
   const [profissao, setProfissao] = useState('')
   const [queixa, setQueixa] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [toastVisible, setToastVisible] = useState(false)
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false)
 
   useEffect(() => {
     window.api.pacientes.obter(id).then((dados: any) => {
       setPaciente(dados)
       if (dados) {
+        setNome(dados.nome || '')
         setTelefone(dados.telefone || '')
-        setEmail(dados.email || '')
         setCpf(dados.cpf || '')
         setEndereco(dados.endereco || '')
         setProfissao(dados.profissao || '')
@@ -390,7 +392,7 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
   const salvarDetalhes = async (e: React.FormEvent) => {
     e.preventDefault()
     setSalvando(true)
-    await window.api.pacientes.atualizar(id, { telefone, email, cpf, endereco, profissao, queixa })
+    await window.api.pacientes.atualizar(id, { nome, telefone, cpf, profissao, queixa })
     setSalvando(false)
     setToastVisible(true)
     setTimeout(() => setToastVisible(false), 3000)
@@ -443,6 +445,16 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
 
         <form onSubmit={salvarDetalhes}>
           <div className="form-grid">
+            <div className="input-group" style={{ gridColumn: '1 / -1' }}>
+              <label>Nome Completo *</label>
+              <input
+                type="text"
+                className="input"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                required
+              />
+            </div>
             <div className="input-group">
               <label>Telefone / WhatsApp</label>
               <div className="input-with-icon">
@@ -456,19 +468,7 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
                 />
               </div>
             </div>
-            <div className="input-group">
-              <label>E-mail</label>
-              <div className="input-with-icon">
-                <Mail size={16} />
-                <input
-                  type="email"
-                  className="input"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@exemplo.com"
-                />
-              </div>
-            </div>
+            
             <div className="input-group">
               <label>CPF</label>
               <input
@@ -489,19 +489,7 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
                 placeholder="Ex: Engenheiro de Software"
               />
             </div>
-            <div className="input-group" style={{ gridColumn: '1 / -1' }}>
-              <label>Endereço Completo</label>
-              <div className="input-with-icon">
-                <MapPin size={16} />
-                <input
-                  type="text"
-                  className="input"
-                  value={endereco}
-                  onChange={(e) => setEndereco(e.target.value)}
-                  placeholder="Rua, Número, Bairro, Cidade - UF"
-                />
-              </div>
-            </div>
+            
             <div className="input-group" style={{ gridColumn: '1 / -1' }}>
               <label>Queixa Principal / Motivo da Consulta</label>
               <textarea
@@ -535,70 +523,27 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
 }
 
 // --- TELA PACIENTES (LISTAGEM & NOVO) ---
-function TelaPacientes() {
-  const [pacientes, setPacientes] = useState<any[]>([])
-  const [busca, setBusca] = useState('')
-  const [modoForm, setModoForm] = useState(false)
-  const [pacienteSelecionado, setPacienteSelecionado] = useState<string | null>(null)
+
+function NovoPacienteForm({ fechar, carregarPacientes }: { fechar: () => void, carregarPacientes: () => void }) {
   const [nome, setNome] = useState('')
   const [dataNascimento, setDataNascimento] = useState('')
   const [telefone, setTelefone] = useState('')
-  const [email, setEmail] = useState('')
-  const [toastVisible, setToastVisible] = useState(false)
-
-  const carregarPacientes = async () => {
-    const dados = await window.api.pacientes.listar()
-    setPacientes(dados)
-  }
-
-  useEffect(() => {
-    carregarPacientes()
-  }, [])
+  const [salvando, setSalvando] = useState(false)
 
   const criarPacienteRapido = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSalvando(true)
     await window.api.pacientes.criar({
       nome,
       dataNascimento: new Date(dataNascimento).toISOString(),
-      telefone,
-      email
+      telefone
     })
-    setModoForm(false)
+    setSalvando(false)
+    fechar()
     carregarPacientes()
-    setToastVisible(true)
-    setTimeout(() => setToastVisible(false), 4000)
   }
 
-  const excluir = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    if (confirm('Tem certeza que deseja excluir este paciente permanentemente com todo o seu histórico?')) {
-      await window.api.pacientes.excluir(id)
-      carregarPacientes()
-    }
-  }
-
-  const pacientesFiltrados = pacientes.filter(
-    (p) =>
-      p.nome.toLowerCase().includes(busca.toLowerCase()) ||
-      (p.telefone && p.telefone.includes(busca)) ||
-      (p.email && p.email.toLowerCase().includes(busca.toLowerCase()))
-  )
-
-  if (pacienteSelecionado) {
-    return (
-      <PerfilPaciente
-        key={`perfil-${pacienteSelecionado}`}
-        id={pacienteSelecionado}
-        voltar={() => {
-          setPacienteSelecionado(null)
-          carregarPacientes()
-        }}
-      />
-    )
-  }
-
-  if (modoForm) {
-    return (
+  return (
       <div key="form-novo" className="page-enter" style={{ padding: '36px 40px' }}>
         <div className="card" style={{ maxWidth: '520px', margin: '0 auto' }}>
           <div
@@ -621,14 +566,13 @@ function TelaPacientes() {
             </div>
             <button
               type="button"
-              onClick={() => setModoForm(false)}
+              onClick={fechar}
               className="btn btn-icon-only"
               title="Fechar"
             >
               <X size={18} />
             </button>
           </div>
-
           <form onSubmit={criarPacienteRapido} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div className="input-group">
               <label>Nome Completo *</label>
@@ -662,29 +606,72 @@ function TelaPacientes() {
                 placeholder="(00) 00000-0000"
               />
             </div>
-            <div className="input-group">
-              <label>E-mail</label>
-              <input
-                type="email"
-                className="input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="email@exemplo.com"
-              />
-            </div>
-
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
-              <button type="button" onClick={() => setModoForm(false)} className="btn btn-secondary">
+              <button type="button" onClick={fechar} className="btn btn-secondary">
                 Cancelar
               </button>
-              <button type="submit" className="btn btn-primary">
+              <button type="submit" className="btn btn-primary" disabled={salvando}>
                 Salvar Paciente
               </button>
             </div>
           </form>
         </div>
       </div>
+  )
+}
+
+
+function TelaPacientes() {
+  const [pacientes, setPacientes] = useState<any[]>([])
+  const [busca, setBusca] = useState('')
+  const [pacienteParaExcluir, setPacienteParaExcluir] = useState<string | null>(null)
+  const [modoForm, setModoForm] = useState(false)
+  const [pacienteSelecionado, setPacienteSelecionado] = useState<string | null>(null)
+  const [nome, setNome] = useState('')
+    const [telefone, setTelefone] = useState('')
+    const [toastVisible, setToastVisible] = useState(false)
+
+  const carregarPacientes = async () => {
+    const dados = await window.api.pacientes.listar()
+    setPacientes(dados)
+  }
+
+  useEffect(() => {
+    carregarPacientes()
+  }, [])
+
+  
+
+  const excluir = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    setPacienteParaExcluir(id)
+  }
+
+  const pacientesFiltrados = pacientes.filter(
+    (p) =>
+      p.nome.toLowerCase().includes(busca.toLowerCase()) ||
+      (p.telefone && p.telefone.includes(busca)) 
+  )
+
+  if (pacienteSelecionado) {
+    return (
+      <PerfilPaciente
+        key={`perfil-${pacienteSelecionado}`}
+        id={pacienteSelecionado}
+        voltar={() => {
+          setPacienteSelecionado(null)
+          carregarPacientes()
+        }}
+      />
     )
+  }
+
+  if (modoForm) {
+    return <NovoPacienteForm fechar={() => setModoForm(false)} carregarPacientes={() => {
+      carregarPacientes();
+      setToastVisible(true);
+      setTimeout(() => setToastVisible(false), 4000);
+    }} />
   }
 
   return (
@@ -706,13 +693,7 @@ function TelaPacientes() {
           <p className="subtitle">Gestão de prontuários cadastrais e acompanhamento</p>
         </div>
         <button
-          onClick={() => {
-            setNome('')
-            setDataNascimento('')
-            setTelefone('')
-            setEmail('')
-            setModoForm(true)
-          }}
+          onClick={() => setModoForm(true)}
           className="btn btn-accent"
         >
           <Plus size={18} /> Novo Paciente
@@ -801,6 +782,20 @@ function TelaPacientes() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!pacienteParaExcluir}
+        title="Excluir Paciente"
+        message="Tem certeza que deseja excluir permanentemente o registro e prontuário deste paciente?"
+        onCancel={() => setPacienteParaExcluir(null)}
+        onConfirm={async () => {
+          if (pacienteParaExcluir) {
+            await window.api.pacientes.excluir(pacienteParaExcluir)
+            setPacienteParaExcluir(null)
+            carregarPacientes()
+          }
+        }}
+      />
     </div>
   )
 }
@@ -817,7 +812,8 @@ function DetalheEditarSessao({
 }) {
   const [sessao, setSessao] = useState<any>(null)
   const [dataSessao, setDataSessao] = useState('')
-  const [resumo, setResumo] = useState('')
+  const [resumo, setResumo] = useState('');
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [anotacoes, setAnotacoes] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [toastVisible, setToastVisible] = useState(false)
@@ -847,10 +843,7 @@ function DetalheEditarSessao({
   }
 
   const handleExcluir = async () => {
-    if (confirm('Tem certeza que deseja excluir o registro desta sessão?')) {
-      await window.api.sessoes.excluir(sessaoId)
-      voltar()
-    }
+    setConfirmarExclusao(true)
   }
 
   const inserirTemplateSOAP = () => {
@@ -1063,11 +1056,20 @@ Próximos Passos (Para casa):
             </button>
           </div>
         </form>
-      </div>
+            <ConfirmModal
+        isOpen={confirmarExclusao}
+        title="Excluir Sessão"
+        message="Tem certeza que deseja excluir o registro desta sessão?"
+        onCancel={() => setConfirmarExclusao(false)}
+        onConfirm={async () => {
+          await window.api.sessoes.excluir(sessaoId)
+          voltar()
+        }}
+      />
+    </div>
     </div>
   )
 }
-
 // --- LISTA DE SESSÕES DO PACIENTE (COM CARDS/BOXES CLICÁVEIS) ---
 function ListaSessoesPaciente({
   pacienteId,
@@ -1083,7 +1085,8 @@ function ListaSessoesPaciente({
 
   // Form states for new session
   const [dataSessao, setDataSessao] = useState(new Date().toISOString().slice(0, 16))
-  const [resumo, setResumo] = useState('')
+  const [resumo, setResumo] = useState('');
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   const [anotacoes, setAnotacoes] = useState('')
   const [toastVisible, setToastVisible] = useState(false)
 
@@ -1589,6 +1592,7 @@ function TelaAgenda() {
   const [sessaoAnotacoes, setSessaoAnotacoes] = useState('')
   const [toastVisible, setToastVisible] = useState(false)
   const [sessaoModalDetalhe, setSessaoModalDetalhe] = useState<any>(null)
+  const [sessaoParaExcluir, setSessaoParaExcluir] = useState<any>(null)
   const [editandoDataHora, setEditandoDataHora] = useState('')
   const [editandoResumo, setEditandoResumo] = useState('')
   const [editandoAnotacoes, setEditandoAnotacoes] = useState('')
@@ -1710,11 +1714,7 @@ function TelaAgenda() {
 
   const excluirSessaoAgenda = async () => {
     if (!sessaoModalDetalhe) return
-    if (confirm('Deseja excluir este agendamento da agenda?')) {
-      await window.api.sessoes.excluir(sessaoModalDetalhe.id)
-      setSessaoModalDetalhe(null)
-      await carregarDados()
-    }
+    setSessaoParaExcluir(sessaoModalDetalhe)
   }
 
   const obterNomePaciente = (pacienteId: string) => {
@@ -2114,6 +2114,21 @@ function TelaAgenda() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={!!sessaoParaExcluir}
+        title="Excluir Sessão"
+        message="Tem certeza que deseja excluir esta sessão da agenda?"
+        onCancel={() => setSessaoParaExcluir(null)}
+        onConfirm={async () => {
+          if (sessaoParaExcluir) {
+            await window.api.sessoes.excluir(sessaoParaExcluir.id)
+            setSessaoParaExcluir(null)
+            setSessaoModalDetalhe(null)
+            carregarDados()
+          }
+        }}
+      />
     </div>
   )
 }

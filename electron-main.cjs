@@ -17,7 +17,7 @@ function createWindow(serverUrl) {
     }
   });
   
-  mainWindow.loadURL(serverUrl || 'http://127.0.0.1:3000');
+  mainWindow.loadURL(serverUrl || 'http://localhost:3000');
   
   mainWindow.on('closed', function () {
     mainWindow = null;
@@ -36,7 +36,7 @@ app.on('ready', () => {
     console.log(`Server: ${output}`);
     
     // Procura a url onde o servidor iniciou
-    const match = output.match(/http:\/\/127\.0\.0\.1:(\d+)/);
+    const match = output.match(/http:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0):(\d+)/);
     if (match) {
       if (!mainWindow) createWindow(match[0]);
     }

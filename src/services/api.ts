@@ -45,9 +45,7 @@ const SEED_PACIENTES: Paciente[] = [
     nome: 'Lucas Oliveira Santos',
     dataNascimento: '1992-05-14T00:00:00.000Z',
     telefone: '(11) 98765-4321',
-    email: 'lucas.santos@email.com',
     cpf: '123.456.789-00',
-    endereco: 'Av. Paulista, 1000, Apto 42 - São Paulo/SP',
     profissao: 'Engenheiro de Software',
     queixa: 'Ansiedade generalizada associada a sobrecarga no trabalho e insônia inicial há cerca de 6 meses.',
     historico: 'Sem histórico psiquiátrico prévio na família. Pratica corrida esporadicamente.',
@@ -60,9 +58,7 @@ const SEED_PACIENTES: Paciente[] = [
     nome: 'Mariana Costa Lima',
     dataNascimento: '1988-11-23T00:00:00.000Z',
     telefone: '(11) 91234-5678',
-    email: 'mariana.lima@email.com',
     cpf: '987.654.321-11',
-    endereco: 'Rua Augusta, 500, Conj 12 - São Paulo/SP',
     profissao: 'Arquiteta Urbanista',
     queixa: 'Dificuldade de concentração, desmotivação e episódios de choro frequentes após término de relacionamento.',
     historico: 'Acompanhamento psicoterápico prévio há 4 anos com boa resposta.',
@@ -75,9 +71,7 @@ const SEED_PACIENTES: Paciente[] = [
     nome: 'Gabriel Pereira Rocha',
     dataNascimento: '2001-03-10T00:00:00.000Z',
     telefone: '(11) 97777-8888',
-    email: 'gabriel.rocha@email.com',
     cpf: '456.789.123-22',
-    endereco: 'Rua Vergueiro, 1200 - São Paulo/SP',
     profissao: 'Estudante Universitário',
     queixa: 'Fobia social e bloqueio para apresentações orais em público.',
     status: 'ativo',
@@ -239,32 +233,53 @@ const SEED_CONFIG: ConfiguracoesApp = {
   ultimaDataBackup: new Date().toISOString()
 }
 
-// STORAGE HELPERS
-function getItem<T>(key: string, seed: T): T {
+
+// STORAGE HELPERS (Remotely persisted)
+let cachedDb: any = null;
+
+async function fetchDb() {
+  if (cachedDb) return cachedDb;
   try {
-    const item = localStorage.getItem(key)
-    if (!item) {
-      localStorage.setItem(key, JSON.stringify(seed))
-      return seed
-    }
-    return JSON.parse(item)
-  } catch (e) {
-    console.error(`Erro ao carregar chave ${key}:`, e)
-    return seed
+    const res = await fetch('/api/db');
+    cachedDb = await res.json();
+    return cachedDb;
+  } catch(e) {
+    return {};
   }
 }
 
-function setItem<T>(key: string, data: T): void {
+async function getItem<T>(key: string, seed: T): Promise<T> {
   try {
-    localStorage.setItem(key, JSON.stringify(data))
+    const db = await fetchDb();
+    if (db[key] === undefined) {
+      await setItem(key, seed);
+      return seed;
+    }
+    return db[key] as T;
   } catch (e) {
-    console.error(`Erro ao salvar chave ${key}:`, e)
+    console.error('Erro ao carregar chave', key, e);
+    return seed;
   }
 }
+
+async function setItem<T>(key: string, data: T): Promise<void> {
+  try {
+    if (!cachedDb) cachedDb = {};
+    cachedDb[key] = data;
+    await fetch('/api/db', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value: data })
+    });
+  } catch (e) {
+    console.error('Erro ao salvar chave', key, e);
+  }
+}
+
 
 // REGISTRADOR DE AUDITORIA
-export function registrarLog(acao: string, categoria: LogAuditoria['categoria'], detalhe: string, pacienteAnonimizadoId?: string) {
-  const logs = getItem<LogAuditoria[]>(STORAGE_KEYS.LOGS, [])
+export async function registrarLog(acao: string, categoria: LogAuditoria['categoria'], detalhe: string, pacienteAnonimizadoId?: string) {
+  const logs = await getItem<LogAuditoria[]>(STORAGE_KEYS.LOGS, [])
   const novoLog: LogAuditoria = {
     id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     timestamp: new Date().toISOString(),
@@ -274,7 +289,7 @@ export function registrarLog(acao: string, categoria: LogAuditoria['categoria'],
     pacienteAnonimizadoId
   }
   const atualizados = [novoLog, ...logs].slice(0, 300) // mantém os últimos 300 logs
-  setItem(STORAGE_KEYS.LOGS, atualizados)
+  await setItem(STORAGE_KEYS.LOGS, atualizados)
 }
 
 // MOTOR DE ANONIMIZAÇÃO CONFORME LGPD
@@ -290,8 +305,6 @@ export function anonimizarTextoClinico(texto: string, paciente?: Paciente): stri
     // Substitui CPF, Telefone, Email, Endereço
     if (paciente.cpf) anonimizado = anonimizado.replace(new RegExp(paciente.cpf.replace(/\./g, '\\.'), 'g'), '[CPF REMOVIDO]')
     if (paciente.telefone) anonimizado = anonimizado.replace(new RegExp(paciente.telefone.replace(/\(/g, '\\(').replace(/\)/g, '\\)'), 'g'), '[TELEFONE REMOVIDO]')
-    if (paciente.email) anonimizado = anonimizado.replace(new RegExp(paciente.email, 'gi'), '[EMAIL REMOVIDO]')
-    if (paciente.endereco) anonimizado = anonimizado.replace(new RegExp(paciente.endereco, 'gi'), '[ENDEREÇO REMOVIDO]')
   }
 
   // Regex geral para telefones, cpfs e emails remanescentes
@@ -308,22 +321,20 @@ export const api = {
   // PACIENTES
   pacientes: {
     listar: async (): Promise<Paciente[]> => {
-      return getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
+      return await getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
     },
     obter: async (id: string): Promise<Paciente | null> => {
-      const lista = getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
+      const lista = await getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
       return lista.find((p) => p.id === id) || null
     },
     criar: async (dados: Partial<Paciente>): Promise<Paciente> => {
-      const lista = getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
+      const lista = await getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
       const novo: Paciente = {
         id: `pac-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         nome: dados.nome || 'Sem nome',
         dataNascimento: dados.dataNascimento || new Date().toISOString(),
         telefone: dados.telefone || '',
-        email: dados.email || '',
         cpf: dados.cpf || '',
-        endereco: dados.endereco || '',
         profissao: dados.profissao || '',
         queixa: dados.queixa || '',
         historico: dados.historico || '',
@@ -331,12 +342,12 @@ export const api = {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
-      setItem(STORAGE_KEYS.PACIENTES, [novo, ...lista])
+      await setItem(STORAGE_KEYS.PACIENTES, [novo, ...lista])
       registrarLog('Criar Paciente', 'PACIENTE', `Prontuário criado para "${novo.nome}"`, novo.id)
       return novo
     },
     atualizar: async (id: string, dados: Partial<Paciente>): Promise<Paciente | null> => {
-      const lista = getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
+      const lista = await getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
       const index = lista.findIndex((p) => p.id === id)
       if (index === -1) return null
       const atualizado: Paciente = {
@@ -345,23 +356,23 @@ export const api = {
         updatedAt: new Date().toISOString()
       }
       lista[index] = atualizado
-      setItem(STORAGE_KEYS.PACIENTES, lista)
+      await setItem(STORAGE_KEYS.PACIENTES, lista)
       registrarLog('Atualizar Paciente', 'PACIENTE', `Dados cadastrais atualizados para "${atualizado.nome}"`, id)
       return atualizado
     },
     arquivar: async (id: string): Promise<boolean> => {
-      const lista = getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
+      const lista = await getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
       const index = lista.findIndex((p) => p.id === id)
       if (index === -1) return false
       lista[index].status = lista[index].status === 'arquivado' ? 'ativo' : 'arquivado'
-      setItem(STORAGE_KEYS.PACIENTES, lista)
+      await setItem(STORAGE_KEYS.PACIENTES, lista)
       registrarLog('Status Paciente', 'PACIENTE', `Status alterado para ${lista[index].status}`, id)
       return true
     },
     excluir: async (id: string): Promise<boolean> => {
-      const lista = getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
+      const lista = await getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
       const filtrados = lista.filter((p) => p.id !== id)
-      setItem(STORAGE_KEYS.PACIENTES, filtrados)
+      await setItem(STORAGE_KEYS.PACIENTES, filtrados)
       registrarLog('Excluir Paciente', 'PACIENTE', `Prontuário excluído permanentemente`, id)
       return true
     }
@@ -370,14 +381,14 @@ export const api = {
   // CONSULTAS & CICLO DE VIDA DA AGENDA
   consultas: {
     listar: async (): Promise<Consulta[]> => {
-      return getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
+      return await getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
     },
     porPaciente: async (pacienteId: string): Promise<Consulta[]> => {
-      const lista = getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
+      const lista = await getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
       return lista.filter((c) => c.pacienteId === pacienteId)
     },
     criar: async (dados: Partial<Consulta>): Promise<Consulta> => {
-      const lista = getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
+      const lista = await getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
       const nova: Consulta = {
         id: `con-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         pacienteId: dados.pacienteId || '',
@@ -388,44 +399,44 @@ export const api = {
         observacoes: dados.observacoes || '',
         createdAt: new Date().toISOString()
       }
-      setItem(STORAGE_KEYS.CONSULTAS, [...lista, nova])
+      await setItem(STORAGE_KEYS.CONSULTAS, [...lista, nova])
       registrarLog('Agendar Consulta', 'CONSULTA', `Consulta agendada para ${new Date(nova.horarioAgendado).toLocaleString('pt-BR')}`, nova.pacienteId)
       return nova
     },
     atualizar: async (id: string, dados: Partial<Consulta>): Promise<Consulta | null> => {
-      const lista = getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
+      const lista = await getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
       const idx = lista.findIndex((c) => c.id === id)
       if (idx === -1) return null
       const atualizada: Consulta = { ...lista[idx], ...dados }
       lista[idx] = atualizada
-      setItem(STORAGE_KEYS.CONSULTAS, lista)
+      await setItem(STORAGE_KEYS.CONSULTAS, lista)
       registrarLog('Atualizar Consulta', 'CONSULTA', `Consulta atualizada: ${atualizada.resumo}`, atualizada.pacienteId)
       return atualizada
     },
     registrarChegada: async (id: string): Promise<Consulta | null> => {
-      const lista = getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
+      const lista = await getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
       const idx = lista.findIndex((c) => c.id === id)
       if (idx === -1) return null
       const agora = new Date().toISOString()
       lista[idx].horarioChegada = agora
       lista[idx].status = 'aguardando'
-      setItem(STORAGE_KEYS.CONSULTAS, lista)
+      await setItem(STORAGE_KEYS.CONSULTAS, lista)
       registrarLog('Chegada do Paciente', 'CONSULTA', `Paciente chegou às ${new Date(agora).toLocaleTimeString('pt-BR')}`, lista[idx].pacienteId)
       return lista[idx]
     },
     iniciarAtendimento: async (id: string): Promise<Consulta | null> => {
-      const lista = getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
+      const lista = await getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
       const idx = lista.findIndex((c) => c.id === id)
       if (idx === -1) return null
       const agora = new Date().toISOString()
       lista[idx].horarioInicio = agora
       lista[idx].status = 'em_atendimento'
-      setItem(STORAGE_KEYS.CONSULTAS, lista)
+      await setItem(STORAGE_KEYS.CONSULTAS, lista)
       registrarLog('Iniciar Atendimento', 'CONSULTA', `Atendimento iniciado às ${new Date(agora).toLocaleTimeString('pt-BR')}`, lista[idx].pacienteId)
       return lista[idx]
     },
     finalizarAtendimento: async (id: string): Promise<{ consulta: Consulta; sessaoGerada: Sessao } | null> => {
-      const lista = getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
+      const lista = await getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
       const idx = lista.findIndex((c) => c.id === id)
       if (idx === -1) return null
       const con = lista[idx]
@@ -439,10 +450,10 @@ export const api = {
       con.duracaoMinutos = Math.max(1, Math.round(duracaoMs / (1000 * 60)))
       
       lista[idx] = con
-      setItem(STORAGE_KEYS.CONSULTAS, lista)
+      await setItem(STORAGE_KEYS.CONSULTAS, lista)
 
       // Gera ou vincula sessão no prontuário
-      const sessoes = getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
+      const sessoes = await getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
       const novaSessao: Sessao = {
         id: `ses-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         pacienteId: con.pacienteId,
@@ -452,23 +463,23 @@ export const api = {
         anotacoes: con.observacoes || `Sessão finalizada. Duração real: ${con.duracaoMinutos} min. Chegada: ${con.horarioChegada ? new Date(con.horarioChegada).toLocaleTimeString('pt-BR') : 'No horário'}.`,
         createdAt: agora.toISOString()
       }
-      setItem(STORAGE_KEYS.SESSOES, [novaSessao, ...sessoes])
+      await setItem(STORAGE_KEYS.SESSOES, [novaSessao, ...sessoes])
       registrarLog('Finalizar Atendimento', 'CONSULTA', `Atendimento finalizado. Duração: ${con.duracaoMinutos} min`, con.pacienteId)
       return { consulta: con, sessaoGerada: novaSessao }
     },
     marcarAusencia: async (id: string): Promise<Consulta | null> => {
-      const lista = getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
+      const lista = await getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
       const idx = lista.findIndex((c) => c.id === id)
       if (idx === -1) return null
       lista[idx].status = 'ausencia'
-      setItem(STORAGE_KEYS.CONSULTAS, lista)
+      await setItem(STORAGE_KEYS.CONSULTAS, lista)
       registrarLog('Marcar Ausência', 'CONSULTA', `Paciente faltou à consulta`, lista[idx].pacienteId)
       return lista[idx]
     },
     excluir: async (id: string): Promise<boolean> => {
-      const lista = getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
+      const lista = await getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
       const filtrados = lista.filter((c) => c.id !== id)
-      setItem(STORAGE_KEYS.CONSULTAS, filtrados)
+      await setItem(STORAGE_KEYS.CONSULTAS, filtrados)
       registrarLog('Excluir Consulta', 'CONSULTA', `Consulta cancelada/removida da agenda`)
       return true
     }
@@ -477,21 +488,21 @@ export const api = {
   // SESSÕES & PRONTUÁRIO
   sessoes: {
     listar: async (pacienteId: string): Promise<Sessao[]> => {
-      const lista = getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
+      const lista = await getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
       return lista
         .filter((s) => s.pacienteId === pacienteId)
         .sort((a, b) => new Date(b.dataSessao).getTime() - new Date(a.dataSessao).getTime())
     },
     todas: async (): Promise<Sessao[]> => {
-      const lista = getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
+      const lista = await getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
       return lista.sort((a, b) => new Date(b.dataSessao).getTime() - new Date(a.dataSessao).getTime())
     },
     obter: async (id: string): Promise<Sessao | null> => {
-      const lista = getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
+      const lista = await getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
       return lista.find((s) => s.id === id) || null
     },
     criar: async (dados: Partial<Sessao>): Promise<Sessao> => {
-      const lista = getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
+      const lista = await getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
       const nova: Sessao = {
         id: `ses-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         pacienteId: dados.pacienteId || '',
@@ -502,12 +513,12 @@ export const api = {
         conteudoIA: dados.conteudoIA,
         createdAt: new Date().toISOString()
       }
-      setItem(STORAGE_KEYS.SESSOES, [nova, ...lista])
+      await setItem(STORAGE_KEYS.SESSOES, [nova, ...lista])
       registrarLog('Criar Sessão', 'SESSAO', `Evolução clínica registrada: "${nova.resumo}"`, nova.pacienteId)
       return nova
     },
     atualizar: async (id: string, dados: Partial<Sessao>): Promise<Sessao | null> => {
-      const lista = getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
+      const lista = await getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
       const index = lista.findIndex((s) => s.id === id)
       if (index === -1) return null
       const atualizada: Sessao = {
@@ -516,15 +527,15 @@ export const api = {
         updatedAt: new Date().toISOString()
       }
       lista[index] = atualizada
-      setItem(STORAGE_KEYS.SESSOES, lista)
+      await setItem(STORAGE_KEYS.SESSOES, lista)
       registrarLog('Atualizar Sessão', 'SESSAO', `Evolução clínica alterada: "${atualizada.resumo}"`, atualizada.pacienteId)
       return atualizada
     },
     excluir: async (id: string): Promise<boolean> => {
-      const lista = getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
+      const lista = await getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
       const sessaoExcluida = lista.find(s => s.id === id)
       const filtrados = lista.filter((s) => s.id !== id)
-      setItem(STORAGE_KEYS.SESSOES, filtrados)
+      await setItem(STORAGE_KEYS.SESSOES, filtrados)
       registrarLog('Excluir Sessão', 'SESSAO', `Sessão clínica removida`, sessaoExcluida?.pacienteId)
       return true
     }
@@ -533,12 +544,12 @@ export const api = {
   // AVALIAÇÕES PSICOLÓGICAS
   avaliacoes: {
     listar: async (pacienteId?: string): Promise<Avaliacao[]> => {
-      const lista = getItem<Avaliacao[]>(STORAGE_KEYS.AVALIACOES, SEED_AVALIACOES)
+      const lista = await getItem<Avaliacao[]>(STORAGE_KEYS.AVALIACOES, SEED_AVALIACOES)
       if (pacienteId) return lista.filter(a => a.pacienteId === pacienteId)
       return lista
     },
     criar: async (dados: Partial<Avaliacao>): Promise<Avaliacao> => {
-      const lista = getItem<Avaliacao[]>(STORAGE_KEYS.AVALIACOES, SEED_AVALIACOES)
+      const lista = await getItem<Avaliacao[]>(STORAGE_KEYS.AVALIACOES, SEED_AVALIACOES)
       const nova: Avaliacao = {
         id: `av-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         pacienteId: dados.pacienteId || '',
@@ -550,13 +561,13 @@ export const api = {
         referenciasUtilizadas: dados.referenciasUtilizadas || '',
         createdAt: new Date().toISOString()
       }
-      setItem(STORAGE_KEYS.AVALIACOES, [nova, ...lista])
+      await setItem(STORAGE_KEYS.AVALIACOES, [nova, ...lista])
       registrarLog('Criar Avaliação', 'PACIENTE', `Avaliação registrada: ${nova.tipo}`, nova.pacienteId)
       return nova
     },
     excluir: async (id: string): Promise<boolean> => {
-      const lista = getItem<Avaliacao[]>(STORAGE_KEYS.AVALIACOES, SEED_AVALIACOES)
-      setItem(STORAGE_KEYS.AVALIACOES, lista.filter(a => a.id !== id))
+      const lista = await getItem<Avaliacao[]>(STORAGE_KEYS.AVALIACOES, SEED_AVALIACOES)
+      await setItem(STORAGE_KEYS.AVALIACOES, lista.filter(a => a.id !== id))
       registrarLog('Excluir Avaliação', 'PACIENTE', `Avaliação removida do histórico`)
       return true
     }
@@ -565,13 +576,13 @@ export const api = {
   // DIAGNÓSTICOS OFICIAIS (CID-10 / CID-11 / DSM-5)
   diagnosticos: {
     listar: async (pacienteId?: string): Promise<Diagnostico[]> => {
-      const lista = getItem<Diagnostico[]>(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS)
+      const lista = await getItem<Diagnostico[]>(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS)
       if (pacienteId) return lista.filter(d => d.pacienteId === pacienteId)
       return lista
     },
     criar: async (dados: Partial<Diagnostico>): Promise<Diagnostico> => {
-      const lista = getItem<Diagnostico[]>(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS)
-      const config = getItem<ConfiguracoesApp>(STORAGE_KEYS.CONFIG, SEED_CONFIG)
+      const lista = await getItem<Diagnostico[]>(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS)
+      const config = await getItem<ConfiguracoesApp>(STORAGE_KEYS.CONFIG, SEED_CONFIG)
       const novo: Diagnostico = {
         id: `diag-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         pacienteId: dados.pacienteId || '',
@@ -585,22 +596,22 @@ export const api = {
         status: dados.status || 'hipotese',
         createdAt: new Date().toISOString()
       }
-      setItem(STORAGE_KEYS.DIAGNOSTICOS, [novo, ...lista])
+      await setItem(STORAGE_KEYS.DIAGNOSTICOS, [novo, ...lista])
       registrarLog('Registro Diagnóstico', 'DIAGNOSTICO', `Diagnóstico oficial registrado: ${novo.codigo} - ${novo.descricao}`, novo.pacienteId)
       return novo
     },
     atualizar: async (id: string, dados: Partial<Diagnostico>): Promise<Diagnostico | null> => {
-      const lista = getItem<Diagnostico[]>(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS)
+      const lista = await getItem<Diagnostico[]>(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS)
       const idx = lista.findIndex(d => d.id === id)
       if (idx === -1) return null
       lista[idx] = { ...lista[idx], ...dados }
-      setItem(STORAGE_KEYS.DIAGNOSTICOS, lista)
+      await setItem(STORAGE_KEYS.DIAGNOSTICOS, lista)
       registrarLog('Atualizar Diagnóstico', 'DIAGNOSTICO', `Diagnóstico atualizado: ${lista[idx].codigo}`, lista[idx].pacienteId)
       return lista[idx]
     },
     excluir: async (id: string): Promise<boolean> => {
-      const lista = getItem<Diagnostico[]>(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS)
-      setItem(STORAGE_KEYS.DIAGNOSTICOS, lista.filter(d => d.id !== id))
+      const lista = await getItem<Diagnostico[]>(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS)
+      await setItem(STORAGE_KEYS.DIAGNOSTICOS, lista.filter(d => d.id !== id))
       registrarLog('Excluir Diagnóstico', 'DIAGNOSTICO', `Registro diagnóstico removido`)
       return true
     }
@@ -638,7 +649,7 @@ export const api = {
       }
     },
     listarAnalises: async (pacienteId?: string): Promise<AnaliseIA[]> => {
-      const lista = getItem<AnaliseIA[]>(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA)
+      const lista = await getItem<AnaliseIA[]>(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA)
       if (pacienteId) return lista.filter(a => a.pacienteId === pacienteId)
       return lista
     },
@@ -771,8 +782,8 @@ export const api = {
         data: new Date().toISOString()
       }
 
-      const lista = getItem<AnaliseIA[]>(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA)
-      setItem(STORAGE_KEYS.ANALISES_IA, [novaAnalise, ...lista])
+      const lista = await getItem<AnaliseIA[]>(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA)
+      await setItem(STORAGE_KEYS.ANALISES_IA, [novaAnalise, ...lista])
       registrarLog('Análise de IA Solicitada', 'IA', `Tipo: ${tipo} | Provedor: ${origemResposta} (${modeloUtilizado})`, pacienteId)
       return novaAnalise
     },
@@ -803,12 +814,12 @@ export const api = {
       return `DECLARAÇÃO / RELATÓRIO PSICOLÓGICO MODELO\n\n1. Identificação: ${pacienteAnonimo || 'Paciente'}\n2. Finalidade: ${finalidade}\n3. Descrição da Demanda: ${dadosClinicos}\n4. Conclusão: Em acompanhamento psicoterapêutico regular.`
     },
     atualizarStatusRevisao: async (id: string, status: StatusRevisaoIA, observacoes?: string): Promise<AnaliseIA | null> => {
-      const lista = getItem<AnaliseIA[]>(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA)
+      const lista = await getItem<AnaliseIA[]>(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA)
       const idx = lista.findIndex(a => a.id === id)
       if (idx === -1) return null
       lista[idx].statusRevisao = status
       if (observacoes !== undefined) lista[idx].observacoesProfissional = observacoes
-      setItem(STORAGE_KEYS.ANALISES_IA, lista)
+      await setItem(STORAGE_KEYS.ANALISES_IA, lista)
       registrarLog('Revisão de IA', 'IA', `Status atualizado para "${status}"`, lista[idx].pacienteId)
       return lista[idx]
     }
@@ -817,10 +828,10 @@ export const api = {
   // AUDITORIA E LOGS
   auditoria: {
     listar: async (): Promise<LogAuditoria[]> => {
-      return getItem<LogAuditoria[]>(STORAGE_KEYS.LOGS, [])
+      return await getItem<LogAuditoria[]>(STORAGE_KEYS.LOGS, [])
     },
     limpar: async (): Promise<boolean> => {
-      setItem(STORAGE_KEYS.LOGS, [])
+      await setItem(STORAGE_KEYS.LOGS, [])
       registrarLog('Limpeza de Logs', 'CONFIG', 'Logs arquivados pelo profissional')
       return true
     }
@@ -832,19 +843,19 @@ export const api = {
       const dump = {
         versao: '2.0.0',
         geradoEm: new Date().toISOString(),
-        pacientes: getItem(STORAGE_KEYS.PACIENTES, SEED_PACIENTES),
-        consultas: getItem(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS),
-        sessoes: getItem(STORAGE_KEYS.SESSOES, SEED_SESSOES),
-        avaliacoes: getItem(STORAGE_KEYS.AVALIACOES, SEED_AVALIACOES),
-        diagnosticos: getItem(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS),
-        analisesIA: getItem(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA),
-        logs: getItem(STORAGE_KEYS.LOGS, []),
-        config: getItem(STORAGE_KEYS.CONFIG, SEED_CONFIG)
+        pacientes: await getItem(STORAGE_KEYS.PACIENTES, SEED_PACIENTES),
+        consultas: await getItem(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS),
+        sessoes: await getItem(STORAGE_KEYS.SESSOES, SEED_SESSOES),
+        avaliacoes: await getItem(STORAGE_KEYS.AVALIACOES, SEED_AVALIACOES),
+        diagnosticos: await getItem(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS),
+        analisesIA: await getItem(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA),
+        logs: await getItem(STORAGE_KEYS.LOGS, []),
+        config: await getItem(STORAGE_KEYS.CONFIG, SEED_CONFIG)
       }
       // Atualiza data do último backup
-      const config = getItem<ConfiguracoesApp>(STORAGE_KEYS.CONFIG, SEED_CONFIG)
+      const config = await getItem<ConfiguracoesApp>(STORAGE_KEYS.CONFIG, SEED_CONFIG)
       config.ultimaDataBackup = new Date().toISOString()
-      setItem(STORAGE_KEYS.CONFIG, config)
+      await setItem(STORAGE_KEYS.CONFIG, config)
       registrarLog('Backup do Sistema', 'BACKUP', 'Exportação completa de banco de dados e prontuários')
       return JSON.stringify(dump, null, 2)
     },
@@ -854,14 +865,14 @@ export const api = {
         if (!dados.pacientes || !Array.isArray(dados.pacientes)) {
           throw new Error('Arquivo de backup inválido')
         }
-        if (dados.pacientes) setItem(STORAGE_KEYS.PACIENTES, dados.pacientes)
-        if (dados.consultas) setItem(STORAGE_KEYS.CONSULTAS, dados.consultas)
-        if (dados.sessoes) setItem(STORAGE_KEYS.SESSOES, dados.sessoes)
-        if (dados.avaliacoes) setItem(STORAGE_KEYS.AVALIACOES, dados.avaliacoes)
-        if (dados.diagnosticos) setItem(STORAGE_KEYS.DIAGNOSTICOS, dados.diagnosticos)
-        if (dados.analisesIA) setItem(STORAGE_KEYS.ANALISES_IA, dados.analisesIA)
-        if (dados.logs) setItem(STORAGE_KEYS.LOGS, dados.logs)
-        if (dados.config) setItem(STORAGE_KEYS.CONFIG, dados.config)
+        if (dados.pacientes) await setItem(STORAGE_KEYS.PACIENTES, dados.pacientes)
+        if (dados.consultas) await setItem(STORAGE_KEYS.CONSULTAS, dados.consultas)
+        if (dados.sessoes) await setItem(STORAGE_KEYS.SESSOES, dados.sessoes)
+        if (dados.avaliacoes) await setItem(STORAGE_KEYS.AVALIACOES, dados.avaliacoes)
+        if (dados.diagnosticos) await setItem(STORAGE_KEYS.DIAGNOSTICOS, dados.diagnosticos)
+        if (dados.analisesIA) await setItem(STORAGE_KEYS.ANALISES_IA, dados.analisesIA)
+        if (dados.logs) await setItem(STORAGE_KEYS.LOGS, dados.logs)
+        if (dados.config) await setItem(STORAGE_KEYS.CONFIG, dados.config)
         registrarLog('Restauração do Sistema', 'BACKUP', 'Base de dados restaurada com sucesso a partir de arquivo de backup')
         return true
       } catch (e) {
@@ -874,17 +885,17 @@ export const api = {
   // CONFIGURAÇÕES E SEGURANÇA LOCAL
   config: {
     obter: async (): Promise<ConfiguracoesApp> => {
-      return getItem<ConfiguracoesApp>(STORAGE_KEYS.CONFIG, SEED_CONFIG)
+      return await getItem<ConfiguracoesApp>(STORAGE_KEYS.CONFIG, SEED_CONFIG)
     },
     salvar: async (novasConfig: Partial<ConfiguracoesApp>): Promise<ConfiguracoesApp> => {
-      const config = getItem<ConfiguracoesApp>(STORAGE_KEYS.CONFIG, SEED_CONFIG)
+      const config = await getItem<ConfiguracoesApp>(STORAGE_KEYS.CONFIG, SEED_CONFIG)
       const atualizado = { ...config, ...novasConfig }
-      setItem(STORAGE_KEYS.CONFIG, atualizado)
+      await setItem(STORAGE_KEYS.CONFIG, atualizado)
       registrarLog('Configurações Alteradas', 'CONFIG', 'Parâmetros do consultório ou segurança atualizados')
       return atualizado
     },
     verificarSenha: async (senhaDigitada: string): Promise<boolean> => {
-      const config = getItem<ConfiguracoesApp>(STORAGE_KEYS.CONFIG, SEED_CONFIG)
+      const config = await getItem<ConfiguracoesApp>(STORAGE_KEYS.CONFIG, SEED_CONFIG)
       if (!config.senhaHash) return true
       return config.senhaHash === senhaDigitada
     }
@@ -893,11 +904,11 @@ export const api = {
   // DASHBOARD RESUMO
   dashboard: {
     resumo: async () => {
-      const pacientes = getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
-      const sessoes = getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
-      const consultas = getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
-      const analises = getItem<AnaliseIA[]>(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA)
-      const diagnosticos = getItem<Diagnostico[]>(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS)
+      const pacientes = await getItem<Paciente[]>(STORAGE_KEYS.PACIENTES, SEED_PACIENTES)
+      const sessoes = await getItem<Sessao[]>(STORAGE_KEYS.SESSOES, SEED_SESSOES)
+      const consultas = await getItem<Consulta[]>(STORAGE_KEYS.CONSULTAS, SEED_CONSULTAS)
+      const analises = await getItem<AnaliseIA[]>(STORAGE_KEYS.ANALISES_IA, SEED_ANALISES_IA)
+      const diagnosticos = await getItem<Diagnostico[]>(STORAGE_KEYS.DIAGNOSTICOS, SEED_DIAGNOSTICOS)
       
       const hojeStr = new Date().toISOString().slice(0, 10)
       const consultasHoje = consultas.filter(c => c.data === hojeStr || c.horarioAgendado.slice(0, 10) === hojeStr)

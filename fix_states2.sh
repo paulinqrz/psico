@@ -1,0 +1,1 @@
+sed -i 's/const \[toastMsg, setToastMsg\] = useState('"''"')/const [toastMsg, setToastMsg] = useState('"''"');\n  const [diagExcluir, setDiagExcluir] = useState<string | null>(null);/g' src/components/DiagnosticosModule.tsx

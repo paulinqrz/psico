@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { ConfirmModal } from './ConfirmModal'
 import {
   ClipboardList,
   Plus,
@@ -47,7 +48,8 @@ export const AvaliacoesModule: React.FC = () => {
   const [instrumento, setInstrumento] = useState(MODELOS_AVALIACOES[0].instrumento)
   const [referenciasUtilizadas, setReferenciasUtilizadas] = useState(MODELOS_AVALIACOES[0].referencia)
   const [observacoes, setObservacoes] = useState('')
-  const [resultados, setResultados] = useState('')
+  const [resultados, setResultados] = useState('');
+  const [avaliacaoExcluir, setAvaliacaoExcluir] = useState<string | null>(null);
 
   const carregarDados = async () => {
     const a = await (window as any).api.avaliacoes.listar()
@@ -94,11 +96,7 @@ export const AvaliacoesModule: React.FC = () => {
   }
 
   const handleExcluir = async (id: string) => {
-    if (confirm('Deseja excluir esta avaliação psicológica do prontuário?')) {
-      await (window as any).api.avaliacoes.excluir(id)
-      await carregarDados()
-      mostrarToast('Avaliação removida.')
-    }
+    setAvaliacaoExcluir(id)
   }
 
   const getNomePaciente = (id: string) => {
@@ -133,8 +131,22 @@ export const AvaliacoesModule: React.FC = () => {
         >
           <Check size={18} color="#10b981" />
           <span style={{ fontSize: '13px', fontWeight: 500 }}>{toastMsg}</span>
-        </div>
-      )}
+              <ConfirmModal
+        isOpen={!!avaliacaoExcluir}
+        title="Excluir Avaliação"
+        message="Deseja excluir esta avaliação psicológica do prontuário?"
+        onCancel={() => setAvaliacaoExcluir(null)}
+        onConfirm={async () => {
+          if (avaliacaoExcluir) {
+            await window.api.avaliacoes.excluir(avaliacaoExcluir)
+            setAvaliacaoExcluir(null)
+            carregarDados()
+          }
+        }}
+      />
+    </div>
+  )
+}
 
       {/* Header */}
       <div

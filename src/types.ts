@@ -5,9 +5,7 @@ export interface Paciente {
   nome: string;
   dataNascimento: string;
   telefone?: string;
-  email?: string;
   cpf?: string;
-  endereco?: string;
   profissao?: string;
   queixa?: string;
   historico?: string;

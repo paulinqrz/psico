@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { ConfirmModal } from './ConfirmModal'
 import {
   FileBadge2,
   Plus,
@@ -53,7 +54,8 @@ export const DiagnosticosModule: React.FC = () => {
   const [descricao, setDescricao] = useState('')
   const [status, setStatus] = useState<Diagnostico['status']>('hipotese')
   const [observacoes, setObservacoes] = useState('')
-  const [toastMsg, setToastMsg] = useState('')
+  const [toastMsg, setToastMsg] = useState('');
+  const [diagExcluir, setDiagExcluir] = useState<string | null>(null);
 
   const carregarDados = async () => {
     const d = await (window as any).api.diagnosticos.listar()
@@ -101,11 +103,7 @@ export const DiagnosticosModule: React.FC = () => {
   }
 
   const handleExcluir = async (id: string) => {
-    if (confirm('Tem certeza que deseja remover este registro diagnóstico do prontuário?')) {
-      await (window as any).api.diagnosticos.excluir(id)
-      await carregarDados()
-      mostrarToast('Registro diagnóstico removido.')
-    }
+    setDiagExcluir(id)
   }
 
   const getNomePaciente = (id: string) => {
@@ -143,8 +141,22 @@ export const DiagnosticosModule: React.FC = () => {
         >
           <Check size={18} color="#10b981" />
           <span style={{ fontSize: '13px', fontWeight: 500 }}>{toastMsg}</span>
-        </div>
-      )}
+              <ConfirmModal
+        isOpen={!!diagExcluir}
+        title="Remover Diagnóstico"
+        message="Tem certeza que deseja remover este registro diagnóstico do prontuário?"
+        onCancel={() => setDiagExcluir(null)}
+        onConfirm={async () => {
+          if (diagExcluir) {
+            await window.api.diagnosticos.excluir(diagExcluir)
+            setDiagExcluir(null)
+            carregarDados()
+          }
+        }}
+      />
+    </div>
+  )
+}
 
       {/* Header */}
       <div

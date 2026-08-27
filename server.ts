@@ -1,3 +1,4 @@
+import fs from 'fs';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -10,9 +11,39 @@ import OpenAI from 'openai';
 
 async function startServer() {
   const app = express();
-  const PORT = 0; // OS escolhe porta aleatória livre para evitar conflitos no desktop
+  const PORT = 3000;
 
   app.use(express.json({ limit: '10mb' }));
+
+  const DB_FILE = path.join(process.cwd(), 'db.json');
+  
+  app.get('/api/db', (req, res) => {
+    try {
+      if (!fs.existsSync(DB_FILE)) {
+        return res.json({});
+      }
+      const data = fs.readFileSync(DB_FILE, 'utf8');
+      res.json(JSON.parse(data));
+    } catch(e) {
+      res.json({});
+    }
+  });
+
+  app.post('/api/db', (req, res) => {
+    try {
+      const { key, value } = req.body;
+      let db = {};
+      if (fs.existsSync(DB_FILE)) {
+        db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+      }
+      db[key] = value;
+      fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+      res.json({ success: true });
+    } catch(e) {
+      res.status(500).json({ success: false });
+    }
+  });
+
 
   // Helper para cliente OpenAI seguro e preguiçoso (lazy init)
   function getOpenAIClient(): OpenAI | null {
@@ -266,9 +297,9 @@ Mantenha tom estritamente técnico, ético, objetivo e respeitoso. Não adicione
     });
   }
 
-  const server = app.listen(PORT, '127.0.0.1', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     const addr = server.address() as any;
-    console.log(`Servidor Clínico Seguro rodando em http://127.0.0.1:${addr.port}`);
+    console.log(`Servidor Clínico Seguro rodando em http://localhost:${addr.port}`);
   });
 
   server.on('error', (e: any) => {

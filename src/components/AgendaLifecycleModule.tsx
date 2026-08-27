@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { ConfirmModal } from './ConfirmModal'
 import {
   CalendarDays,
   Clock,
@@ -25,7 +26,9 @@ export const AgendaLifecycleModule: React.FC = () => {
   const [selectedPacienteId, setSelectedPacienteId] = useState('')
   const [consultaResumo, setConsultaResumo] = useState('')
   const [consultaObs, setConsultaObs] = useState('')
-  const [toastMsg, setToastMsg] = useState('')
+  const [toastMsg, setToastMsg] = useState('');
+  const [ausenciaConfirm, setAusenciaConfirm] = useState<any>(null);
+  const [excluirConfirm, setExcluirConfirm] = useState<string | null>(null);
 
   const carregarDados = async () => {
     const c = await (window as any).api.consultas.listar()
@@ -117,21 +120,11 @@ export const AgendaLifecycleModule: React.FC = () => {
 
   const handleMarcarAusencia = async (c: Consulta, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
-    if (confirm(`Confirmar registro de ausência para ${getNomePaciente(c.pacienteId)}?`)) {
-      await (window as any).api.consultas.marcarAusencia(c.id)
-      await carregarDados()
-      mostrarToast(`Ausência registrada.`)
-      if (modalDetalheConsulta?.id === c.id) setModalDetalheConsulta(null)
-    }
+    setAusenciaConfirm(c)
   }
 
   const handleExcluirConsulta = async (id: string) => {
-    if (confirm('Deseja realmente remover este agendamento?')) {
-      await (window as any).api.consultas.excluir(id)
-      await carregarDados()
-      setModalDetalheConsulta(null)
-      mostrarToast('Consulta removida da agenda.')
-    }
+    setExcluirConfirm(id)
   }
 
   const abrirModalNovoAgendamento = (dataDefault?: Date, horaDefault = '09:00') => {
@@ -201,8 +194,35 @@ export const AgendaLifecycleModule: React.FC = () => {
         >
           <Check size={18} color="#10b981" />
           <span style={{ fontSize: '13px', fontWeight: 500 }}>{toastMsg}</span>
-        </div>
-      )}
+              <ConfirmModal
+        isOpen={!!ausenciaConfirm}
+        title="Registrar Ausência"
+        message={"Confirmar registro de ausência para " + (ausenciaConfirm ? getNomePaciente(ausenciaConfirm.pacienteId) : "") + "?"}
+        onCancel={() => setAusenciaConfirm(null)}
+        onConfirm={async () => {
+          if (ausenciaConfirm) {
+            await window.api.consultas.marcarAusencia(ausenciaConfirm.id)
+            setAusenciaConfirm(null)
+            carregarDados()
+          }
+        }}
+      />
+      <ConfirmModal
+        isOpen={!!excluirConfirm}
+        title="Remover Agendamento"
+        message="Deseja realmente remover este agendamento?"
+        onCancel={() => setExcluirConfirm(null)}
+        onConfirm={async () => {
+          if (excluirConfirm) {
+            await window.api.consultas.excluir(excluirConfirm)
+            setExcluirConfirm(null)
+            carregarDados()
+          }
+        }}
+      />
+    </div>
+  )
+}
 
       {/* Header */}
       <div
