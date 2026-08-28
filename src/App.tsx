@@ -349,7 +349,6 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
   const [profissao, setProfissao] = useState('')
   const [queixa, setQueixa] = useState('')
   const [salvando, setSalvando] = useState(false)
-  const [toastVisible, setToastVisible] = useState(false)
 
   useEffect(() => {
     window.api.pacientes.obter(id).then((dados: any) => {
@@ -386,8 +385,7 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
     setSalvando(true)
     await window.api.pacientes.atualizar(id, { nome, telefone, cpf, endereco, profissao, queixa })
     setSalvando(false)
-    setToastVisible(true)
-    setTimeout(() => setToastVisible(false), 3000)
+    voltar()
   }
 
   if (!paciente) return <div style={{ padding: '40px', color: '#64748b' }}>Carregando dados do paciente...</div>
@@ -398,8 +396,6 @@ function PerfilPaciente({ id, voltar }: { id: string; voltar: () => void }) {
 
   return (
     <div key={`perfil-${id}`} className="page-enter" style={{ padding: '36px 40px', maxWidth: '1000px', margin: '0 auto' }}>
-      <Toast message="Dados do paciente atualizados com sucesso!" visible={toastVisible} onClose={() => setToastVisible(false)} />
-
       <div className="breadcrumbs">
         <button onClick={voltar} className="breadcrumb-item">
           Pacientes
@@ -630,7 +626,7 @@ function TelaPacientes() {
   const [pacienteParaExcluir, setPacienteParaExcluir] = useState<string | null>(null)
   const [modoForm, setModoForm] = useState(false)
   const [pacienteSelecionado, setPacienteSelecionado] = useState<string | null>(null)
-  const [toastVisible, setToastVisible] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
 
   const carregarPacientes = async () => {
     const dados = await window.api.pacientes.listar()
@@ -640,8 +636,6 @@ function TelaPacientes() {
   useEffect(() => {
     carregarPacientes()
   }, [])
-
-  
 
   const excluir = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
@@ -662,22 +656,29 @@ function TelaPacientes() {
         voltar={() => {
           setPacienteSelecionado(null)
           carregarPacientes()
+          setToastMsg('Dados do paciente atualizados com sucesso!')
+          setTimeout(() => setToastMsg(''), 3000)
         }}
       />
     )
   }
 
   if (modoForm) {
-    return <NovoPacienteForm fechar={() => setModoForm(false)} carregarPacientes={() => {
-      carregarPacientes();
-      setToastVisible(true);
-      setTimeout(() => setToastVisible(false), 4000);
-    }} />
+    return (
+      <NovoPacienteForm
+        fechar={() => setModoForm(false)}
+        carregarPacientes={() => {
+          carregarPacientes()
+          setToastMsg('Paciente cadastrado com sucesso!')
+          setTimeout(() => setToastMsg(''), 4000)
+        }}
+      />
+    )
   }
 
   return (
     <div key="lista-pacientes" className="page-enter" style={{ padding: '36px 40px' }}>
-      <Toast message="Paciente cadastrado com sucesso!" visible={toastVisible} onClose={() => setToastVisible(false)} />
+      <Toast message={toastMsg} visible={!!toastMsg} onClose={() => setToastMsg('')} />
 
       <div
         style={{
@@ -813,11 +814,10 @@ function DetalheEditarSessao({
 }) {
   const [sessao, setSessao] = useState<any>(null)
   const [dataSessao, setDataSessao] = useState('')
-  const [resumo, setResumo] = useState('');
-  const [confirmarExclusao, setConfirmarExclusao] = useState(false);
+  const [resumo, setResumo] = useState('')
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false)
   const [anotacoes, setAnotacoes] = useState('')
   const [salvando, setSalvando] = useState(false)
-  const [toastVisible, setToastVisible] = useState(false)
 
   useEffect(() => {
     window.api.sessoes.obter(sessaoId).then((dados: any) => {
@@ -839,8 +839,7 @@ function DetalheEditarSessao({
       anotacoes
     })
     setSalvando(false)
-    setToastVisible(true)
-    setTimeout(() => setToastVisible(false), 3000)
+    voltar()
   }
 
   const handleExcluir = async () => {
@@ -880,8 +879,6 @@ Próximos Passos (Para casa):
 
   return (
     <div key={`detalhe-sessao-${sessaoId}`} className="page-enter" style={{ padding: '36px 40px', maxWidth: '1000px', margin: '0 auto' }}>
-      <Toast message="Sessão e anotações salvas com sucesso!" visible={toastVisible} onClose={() => setToastVisible(false)} />
-
       {/* Breadcrumb navigation */}
       <div className="breadcrumbs">
         <button onClick={voltar} className="breadcrumb-item">
@@ -1089,7 +1086,7 @@ function ListaSessoesPaciente({
   const [resumo, setResumo] = useState('')
   const [sessaoExcluirId, setSessaoExcluirId] = useState<string | null>(null)
   const [anotacoes, setAnotacoes] = useState('')
-  const [toastVisible, setToastVisible] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
 
   const carregarDados = async () => {
     const p = await window.api.pacientes.obter(pacienteId)
@@ -1104,7 +1101,7 @@ function ListaSessoesPaciente({
 
   const salvarNovaSessao = async (e: React.FormEvent) => {
     e.preventDefault()
-    const nova = await window.api.sessoes.criar({
+    await window.api.sessoes.criar({
       pacienteId,
       dataSessao: new Date(dataSessao).toISOString(),
       resumo,
@@ -1114,10 +1111,8 @@ function ListaSessoesPaciente({
     setResumo('')
     setAnotacoes('')
     await carregarDados()
-    setToastVisible(true)
-    setTimeout(() => setToastVisible(false), 3000)
-    // Opcional: abre a sessão criada para edição se desejar
-    setSessaoSelecionada(nova.id)
+    setToastMsg('Nova sessão registrada com sucesso!')
+    setTimeout(() => setToastMsg(''), 3000)
   }
 
   const inserirTemplateSOAPNovo = () => {
@@ -1156,6 +1151,8 @@ Próximos Passos (Para casa):
         voltar={() => {
           setSessaoSelecionada(null)
           carregarDados()
+          setToastMsg('Prontuário da sessão atualizado com sucesso!')
+          setTimeout(() => setToastMsg(''), 3000)
         }}
       />
     )
@@ -1171,7 +1168,7 @@ Próximos Passos (Para casa):
 
   return (
     <div key={`sessoes-paciente-${pacienteId}`} className="page-enter" style={{ padding: '36px 40px', maxWidth: '1000px', margin: '0 auto' }}>
-      <Toast message="Nova sessão registrada com sucesso!" visible={toastVisible} onClose={() => setToastVisible(false)} />
+      <Toast message={toastMsg} visible={!!toastMsg} onClose={() => setToastMsg('')} />
 
       {/* Breadcrumb */}
       <div className="breadcrumbs">
